@@ -4,6 +4,8 @@
 
 No server, no signup, no dependencies — just open the HTML file and start planning.
 
+Link: [https://mindactuate.github.io/multi-project-milestone-calculator/](https://mindactuate.github.io/multi-project-milestone-calculator/)
+
 ![Screenshot](screenshot.png)
 
 ---
