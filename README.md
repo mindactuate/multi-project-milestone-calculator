@@ -31,6 +31,7 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 - **Multi-month simulation** — teams work off effort over time, not "one milestone = one month"
 - **Two scheduling strategies:** Max. Parallelization and Max. Speed/Priority
 - **Per-milestone dependency control** — 🔒/🔓 toggle per milestone row
+- **Project priority** — ▲/▼ arrows to reorder project blocks (top = highest priority in Speed mode)
 - One-click strategy toggle with automatic re-scheduling
 - Configurable start month and year
 - Up to 48 months planning horizon
@@ -64,7 +65,6 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 - No server, no cookies, no tracking, no analytics
 - **No external resources** — no Google Fonts, no CDN calls, no tracking pixels
 - System fonts only (SF Mono, Segoe UI, etc.) — zero network requests beyond the HTML itself
-- Built-in **Impressum** (Legal Notice) and **Datenschutzerklärung** (Privacy Policy) modals with placeholder templates ready for your details — required for DSGVO/GDPR compliance when hosting in Germany
 
 ---
 
@@ -119,7 +119,7 @@ Each team distributes its monthly capacity **proportionally** across all eligibl
 
 ### ⚡ Max. Speed (Priority)
 
-Each team puts **all capacity into the highest-priority eligible milestone** first. Only if there's leftover capacity does it spill to the next. Projects higher in the table have higher priority.
+Each team puts **all capacity into the highest-priority eligible milestone** first. Only if there's leftover capacity does it spill to the next. Projects higher in the table have higher priority — use the ▲/▼ arrows in the Prio column to reorder.
 
 ### Common rules
 
