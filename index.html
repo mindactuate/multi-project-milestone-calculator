@@ -299,11 +299,11 @@ const legalContent = {
     de: `
       <h2>Impressum</h2>
       <h3>Angaben gemäß § 5 DDG</h3>
-      <div class="placeholder"><br>Daniel Gruner<br>Ludwig-Essinger-Str 1<br>74080 HN<br>Deutschland</div>
+      <div class="placeholder">⚠ HIER DEINE DATEN EINTRAGEN:<br>Vor- und Nachname<br>Straße Hausnummer<br>PLZ Ort<br>Deutschland</div>
       <h3>Kontakt</h3>
-      <div class="placeholder">dnlgrnr911[at]gmail.com</div>
+      <div class="placeholder">⚠ E-Mail: deine@email.de</div>
       <h3>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h3>
-      <div class="placeholder">Daniel Gruner<br>Adresse wie oben</div>
+      <div class="placeholder">⚠ Vor- und Nachname<br>Adresse wie oben</div>
       <h3>Haftung für Inhalte</h3>
       <p>Als Diensteanbieter sind wir gemäß § 7 Abs.1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht unter Verpflichtung, übermittelte oder gespeicherte fremde Informationen zu überwachen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.</p>
       <h3>Haftung für Links</h3>
@@ -312,11 +312,11 @@ const legalContent = {
     en: `
       <h2>Legal Notice (Impressum)</h2>
       <h3>Information according to § 5 DDG (German Digital Services Act)</h3>
-      <div class="placeholder"><br>Daniel Gruner<br>Ludwig-Essinger-Str 1<br>74080 HN<br>Germany</div>
+      <div class="placeholder">⚠ INSERT YOUR DETAILS HERE:<br>First and Last Name<br>Street and Number<br>ZIP City<br>Country</div>
       <h3>Contact</h3>
-      <div class="placeholder">dnlgrnr911[at]gmail.com</div>
+      <div class="placeholder">⚠ Email: your@email.com</div>
       <h3>Responsible for content according to § 18 Abs. 2 MStV</h3>
-      <div class="placeholder">Daniel Gruner<br>Address as above</div>
+      <div class="placeholder">⚠ First and Last Name<br>Address as above</div>
       <h3>Liability for Content</h3>
       <p>As a service provider, we are responsible for our own content on these pages in accordance with general legislation pursuant to § 7 (1) DDG. However, according to §§ 8 to 10 DDG, we are not obligated to monitor transmitted or stored third-party information.</p>
       <h3>Liability for Links</h3>
@@ -327,7 +327,7 @@ const legalContent = {
     de: `
       <h2>Datenschutzerklärung</h2>
       <h3>1. Verantwortlicher</h3>
-      <div class="placeholder">Daniel Gruner<br>Ludwig-Essinger-Str. 1, 74080 HN<br>E-Mail: dnlgrnr911@gmail.com</div>
+      <div class="placeholder">⚠ HIER DEINE DATEN EINTRAGEN:<br>Vor- und Nachname<br>Adresse<br>E-Mail: deine@email.de</div>
 
       <h3>2. Hosting</h3>
       <p>Diese Website wird über <strong>GitHub Pages</strong> gehostet von GitHub Inc., 88 Colin P Kelly Jr St, San Francisco, CA 94107, USA.</p>
@@ -349,7 +349,7 @@ const legalContent = {
     en: `
       <h2>Privacy Policy</h2>
       <h3>1. Data Controller</h3>
-      <div class="placeholder">Daniel Gruner<br>Ludwig-Essinger-Str. 1, 74080 HN<br>E-Mail: dnlgrnr911@gmail.com</div>
+      <div class="placeholder">⚠ INSERT YOUR DETAILS HERE:<br>First and Last Name<br>Address<br>Email: your@email.com</div>
 
       <h3>2. Hosting</h3>
       <p>This website is hosted via <strong>GitHub Pages</strong> by GitHub Inc., 88 Colin P Kelly Jr St, San Francisco, CA 94107, USA.</p>
@@ -585,9 +585,9 @@ function renderCapacity() {
       <div class="cap-badge" style="background:${team.color}" title="Klick für Farbe"
            onclick="cycleColor('${team.id}')">${idx+1}</div>
       <input type="text" class="cap-name-input" value="${esc(team.name)}"
-             onchange="updateTeam('${team.id}','name',this.value)">
+             oninput="updateTeam('${team.id}','name',this.value)">
       <input type="number" class="cap-num-input" min="1" value="${team.capacity}"
-             onchange="updateTeam('${team.id}','capacity',parseInt(this.value)||1)">
+             oninput="updateTeam('${team.id}','capacity',parseInt(this.value)||1)">
       <span class="cap-unit">PT</span>
       <button class="cap-del" onclick="removeTeam('${team.id}')" title="Team entfernen">×</button>`;
     g.appendChild(c);
@@ -602,7 +602,10 @@ function renderCapacity() {
 
 function updateTeam(id, prop, val) {
   const team = state.teams.find(t => t.id === id);
-  if (team) { team[prop] = val; renderTableHeaders(); }
+  if (!team) return;
+  team[prop] = val;
+  renderTableHeaders();
+  if (state.schedule) renderGantt();
 }
 
 function cycleColor(id) {
@@ -619,11 +622,12 @@ function cycleColor(id) {
 // ═══════════════════════════════════════════════════════
 function renderTableHeaders() {
   const tr = document.getElementById('tableHead');
-  tr.innerHTML = `<th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
+  let html = `<th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
   state.teams.forEach(team => {
-    tr.innerHTML += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`;
+    html += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`;
   });
-  tr.innerHTML += '<th style="width:40px"></th>';
+  html += '<th style="width:40px"></th>';
+  tr.innerHTML = html;
 }
 
 function renderTable() {
@@ -644,11 +648,11 @@ function renderTable() {
   state.rows.forEach((row, i) => {
     const tr = document.createElement('tr');
     let html = `
-      <td><input type="text" value="${esc(row.project)}" onchange="state.rows[${i}].project=this.value" placeholder="${L('phProject')}"></td>
-      <td><input type="text" value="${esc(row.milestone)}" onchange="state.rows[${i}].milestone=this.value" placeholder="${L('phMilestone')}"></td>`;
+      <td><input type="text" value="${esc(row.project)}" oninput="state.rows[${i}].project=this.value" placeholder="${L('phProject')}"></td>
+      <td><input type="text" value="${esc(row.milestone)}" oninput="state.rows[${i}].milestone=this.value" placeholder="${L('phMilestone')}"></td>`;
     state.teams.forEach(team => {
       const val = row.efforts[team.id] || 0;
-      html += `<td><input type="number" min="0" value="${val}" onchange="state.rows[${i}].efforts['${team.id}']=parseFloat(this.value)||0"></td>`;
+      html += `<td><input type="number" min="0" value="${val}" oninput="state.rows[${i}].efforts['${team.id}']=parseFloat(this.value)||0"></td>`;
     });
     html += `<td><button class="row-del" onclick="deleteRow(${i})">×</button></td>`;
     tr.innerHTML = html;
