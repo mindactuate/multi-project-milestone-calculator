@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projekt-Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #181b24; --bg3: #1e222e;
+    --border: #2a2f3e; --text: #e2e4ea; --text2: #8b90a0;
+    --accent: #4e9af5; --accent2: #3b7dd8;
+    --green: #34d399; --orange: #f59e0b; --red: #ef4444;
+    --radius: 6px;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; line-height:1.5; }
+  .app { max-width:1440px; margin:0 auto; padding:24px; }
+
+  /* Header */
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; padding-bottom:20px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:12px; }
+  header h1 { font-family:var(--mono); font-size:20px; font-weight:700; letter-spacing:-0.5px; }
+  header h1 span { color:var(--accent); }
+  .header-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .save-indicator { font-family:var(--mono); font-size:11px; color:var(--text2); display:flex; align-items:center; gap:6px; }
+  .save-dot { width:6px; height:6px; border-radius:50%; background:var(--green); transition:background .3s; }
+  .save-dot.saving { background:var(--orange); }
+  .header-link { font-family:var(--mono); font-size:11px; color:var(--text2); text-decoration:none; display:flex; align-items:center; gap:6px; padding:6px 12px; border:1px solid var(--border); border-radius:var(--radius); transition:all .2s; }
+  .header-link:hover { color:var(--text); border-color:var(--text2); background:var(--bg3); }
+  .header-link.paypal-link:hover { color:#0070ba; border-color:#0070ba; }
+
+  .lang-toggle { font-family:var(--mono); font-size:11px; font-weight:600; display:flex; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .lang-toggle button { padding:5px 10px; border:none; background:var(--bg2); color:var(--text2); cursor:pointer; font:inherit; transition:all .15s; }
+  .lang-toggle button:not(:last-child) { border-right:1px solid var(--border); }
+  .lang-toggle button.active { background:var(--accent); color:#fff; }
+  .lang-toggle button:hover:not(.active) { color:var(--text); background:var(--bg3); }
+
+  /* Toolbar */
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px; }
+  .btn { font-family:var(--mono); font-size:12px; font-weight:500; padding:8px 16px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg2); color:var(--text); cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .btn:hover { border-color:var(--accent); color:var(--accent); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.primary:hover { background:var(--accent2); }
+  .btn.danger { border-color:var(--red); color:var(--red); }
+  .btn.danger:hover { background:var(--red); color:#fff; }
+  .btn.small { padding:4px 10px; font-size:11px; }
+
+  /* Panels */
+  .panels { display:grid; grid-template-columns:1fr; gap:24px; }
+  .panel { background:var(--bg2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .panel-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); background:var(--bg3); flex-wrap:wrap; gap:8px; }
+  .panel-header h2 { font-family:var(--mono); font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text2); }
+  .panel-body { padding:18px; }
+
+  /* Capacity */
+  .capacity-grid { display:flex; flex-wrap:wrap; gap:12px; align-items:stretch; }
+  .cap-card { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); min-width:240px; flex:0 1 320px; position:relative; }
+  .cap-badge { font-family:var(--mono); font-size:11px; font-weight:700; width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; cursor:pointer; position:relative; }
+  .cap-name-input { flex:1; font-family:var(--sans); font-size:13px; font-weight:600; padding:4px 8px; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--text); min-width:0; }
+  .cap-name-input:focus { outline:none; border-color:var(--accent); background:var(--bg); }
+  .cap-num-input { width:56px; font-family:var(--mono); font-size:13px; padding:4px 6px; border:1px solid var(--border); border-radius:4px; background:var(--bg2); color:var(--text); text-align:right; }
+  .cap-num-input:focus { outline:none; border-color:var(--accent); }
+  .cap-unit { font-family:var(--mono); font-size:11px; color:var(--text2); }
+  .cap-del { width:22px; height:22px; border:none; background:none; color:var(--text2); cursor:pointer; border-radius:4px; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cap-del:hover { background:var(--red); color:#fff; }
+  .cap-add { display:flex; align-items:center; justify-content:center; min-width:100px; flex:0 0 auto; padding:10px 20px; background:var(--bg); border:2px dashed var(--border); border-radius:var(--radius); cursor:pointer; font-family:var(--mono); font-size:12px; color:var(--text2); transition:all .15s; }
+  .cap-add:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* Settings row */
+  .settings-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .settings-row label { font-size:12px; color:var(--text2); display:flex; align-items:center; gap:6px; }
+  .settings-row select, .settings-row input[type="number"] { font-family:var(--mono); font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); }
+  .settings-row select:focus, .settings-row input:focus { outline:none; border-color:var(--accent); }
+
+  /* Table */
+  .table-wrap { overflow-x:auto; margin:0 -18px; padding:0 18px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th { font-family:var(--mono); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text2); text-align:left; padding:10px 12px; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--bg2); }
+  tbody td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tbody tr:hover { background:var(--bg3); }
+  td input, td select { font-family:var(--mono); font-size:13px; padding:4px 8px; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--text); width:100%; }
+  td input:hover { border-color:var(--border); }
+  td input:focus { outline:none; border-color:var(--accent); background:var(--bg); }
+  td input[type="number"] { width:70px; text-align:right; }
+  .row-del { width:28px; height:28px; border:none; background:none; color:var(--text2); cursor:pointer; border-radius:4px; font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .row-del:hover { background:var(--red); color:#fff; }
+
+  /* Gantt */
+  .gantt-container { overflow-x:auto; padding-bottom:12px; }
+  .gantt { min-width:800px; }
+  .gantt-header { display:flex; border-bottom:2px solid var(--border); margin-left:220px; }
+  .gantt-month { flex:0 0 80px; font-family:var(--mono); font-size:11px; font-weight:600; color:var(--text2); text-align:center; padding:8px 0; border-left:1px solid var(--border); }
+  .gantt-row { display:flex; align-items:center; min-height:36px; border-bottom:1px solid var(--border); }
+  .gantt-label { flex:0 0 220px; font-size:12px; padding:4px 12px; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gantt-label .proj-tag { font-family:var(--mono); font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px; background:var(--bg3); color:var(--text2); border:1px solid var(--border); }
+  .gantt-bars { flex:1; display:flex; min-height:28px; }
+  .gantt-cell { flex:0 0 80px; border-left:1px solid var(--border); position:relative; min-height:28px; }
+  .gantt-bar { position:absolute; top:4px; height:20px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; font-weight:600; color:#fff; z-index:2; min-width:24px; box-shadow:0 1px 3px rgba(0,0,0,.3); left:4px; right:4px; }
+
+  /* Capacity overview */
+  .capacity-overview { margin-top:24px; }
+  .cap-row { display:flex; align-items:center; margin-bottom:6px; }
+  .cap-row-label { flex:0 0 220px; font-family:var(--mono); font-size:11px; font-weight:600; padding:0 12px; display:flex; align-items:center; gap:6px; }
+  .cap-cells { display:flex; flex:1; }
+  .cap-cell { flex:0 0 80px; border-left:1px solid var(--border); padding:2px 4px; height:24px; }
+  .cap-fill { height:100%; border-radius:2px; transition:width .3s; position:relative; }
+  .cap-pct { font-family:var(--mono); font-size:9px; font-weight:600; color:#fff; position:absolute; right:4px; top:50%; transform:translateY(-50%); text-shadow:0 1px 2px rgba(0,0,0,.5); }
+
+  /* Warnings */
+  .warning-list { list-style:none; padding:0; }
+  .warning-list li { font-size:12px; padding:6px 10px; margin-bottom:4px; border-radius:4px; display:flex; align-items:center; gap:8px; }
+  .warning-list li.over { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:var(--red); }
+  .warning-list li.ok { background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.3); color:var(--green); }
+
+  .empty-state { text-align:center; padding:48px 24px; color:var(--text2); font-size:14px; }
+  .empty-state code { font-family:var(--mono); background:var(--bg); padding:2px 6px; border-radius:3px; font-size:12px; }
+
+  input[type="file"] { display:none; }
+
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--bg3); border:1px solid var(--border); padding:10px 18px; border-radius:var(--radius); font-family:var(--mono); font-size:12px; color:var(--green); opacity:0; transform:translateY(10px); transition:all .3s; z-index:100; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  .app-footer { margin-top:32px; padding:16px 0; border-top:1px solid var(--border); text-align:center; font-family:var(--mono); font-size:11px; color:var(--text2); line-height:1.6; }
+
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text2); }
+
+  @media (max-width:768px) { .app { padding:12px; } header { flex-direction:column; align-items:flex-start; } .toolbar { gap:4px; } .btn { padding:6px 10px; font-size:11px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="appHeader"></div>
+  <div id="appToolbar"></div>
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header">
+        <h2 id="panelCapTitle"></h2>
+        <div class="settings-row">
+          <label><span id="lblStart"></span><select id="startMonth"></select></label>
+          <label><span id="lblYear"></span><input type="number" id="startYear" value="2026" style="width:70px"></label>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="capacity-grid" id="capacityGrid"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <h2 id="panelDataTitle"></h2>
+        <span style="font-size:11px;color:var(--text2);font-family:var(--mono)" id="rowCount"></span>
+      </div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table><thead><tr id="tableHead"></tr></thead><tbody id="dataBody"></tbody></table>
+          <div class="empty-state" id="emptyState"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="ganttPanel" style="display:none">
+      <div class="panel-header">
+        <h2 id="panelGanttTitle"></h2>
+        <span style="font-size:11px;color:var(--text2);font-family:var(--mono)" id="schedInfo"></span>
+      </div>
+      <div class="panel-body">
+        <div class="gantt-container"><div class="gantt" id="ganttChart"></div></div>
+        <div class="capacity-overview" id="capOverview"></div>
+      </div>
+    </div>
+    <div class="panel" id="warnPanel" style="display:none">
+      <div class="panel-header"><h2 id="panelAnalysisTitle"></h2></div>
+      <div class="panel-body"><ul class="warning-list" id="warnings"></ul></div>
+    </div>
+  </div>
+  <footer id="appFooter"></footer>
+</div>
+<div class="toast" id="toast"></div>
+<input type="file" id="csvInput" accept=".csv" onchange="importCSV(event)">
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  Color Palette for Teams
+// ═══════════════════════════════════════════════════════
+const PALETTE = [
+  '#4e9af5','#f59e0b','#34d399','#a78bfa','#f472b6',
+  '#22d3ee','#f97316','#6366f1','#e879f9','#84cc16',
+  '#fb923c','#2dd4bf','#f43f5e','#818cf8','#fbbf24'
+];
+
+// ═══════════════════════════════════════════════════════
+//  i18n
+// ═══════════════════════════════════════════════════════
+const i18n = {
+  de: {
+    months:['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'],
+    title:'Projekt-Scheduler',
+    githubTip:'⭐ Repo auf GitHub', githubLabel:'Star on GitHub',
+    paypalTip:'Einen Kaffee spendieren ☕', paypalLabel:'Kaffee spendieren',
+    ready:'bereit', saving:'speichert...', saved:'gespeichert',
+    btnLoadCSV:'⬆ CSV laden', btnSaveCSV:'⬇ CSV speichern',
+    btnExample:'◆ Beispiel laden', btnAddRow:'+ Zeile',
+    btnSchedule:'▶ Scheduling starten', btnClear:'✕ Alles löschen',
+    panelCapacity:'Team-Kapazitäten (PT / Monat)',
+    panelData:'Projektdaten', panelGantt:'Zeitplan (Gantt)', panelAnalysis:'Analyse',
+    lblStart:'Start:', lblYear:'Jahr:',
+    thProject:'Projekt', thMilestone:'Meilenstein',
+    phProject:'Projekt', phMilestone:'Meilenstein',
+    addTeam:'+ Team',
+    entries: n => `${n} Einträge`,
+    emptyState:'Noch keine Daten. Lade ein CSV oder klicke <code>Beispiel laden</code>.',
+    schedInfo:(m,p) => `${m} Monate · ${p} Projekte`,
+    capUtilTitle:'Kapazitätsauslastung',
+    warnOver:(name,lbl,used,cap,pct) => `⚠ ${name} in ${lbl}: ${used} PT geplant, nur ${cap} PT verfügbar (${pct}%)`,
+    warnOk:'✓ Alle Teams innerhalb der Kapazitätsgrenzen',
+    toastCSVLoaded: n => `CSV geladen — ${n} Zeilen`,
+    toastCSVExported:'CSV exportiert', toastNoData:'Keine Daten vorhanden',
+    toastNoExport:'Keine Daten zum Exportieren',
+    toastExampleLoaded:'Beispieldaten geladen', toastCleared:'Daten gelöscht',
+    toastScheduled:'Scheduling abgeschlossen', confirmClear:'Alle Daten löschen?',
+    toastMinTeam:'Mindestens ein Team erforderlich',
+    disclaimer:'🔒 Alle Daten werden ausschließlich lokal in deinem Browser gespeichert (localStorage). Es werden keine Daten an einen Server gesendet.',
+    csvProject:'Projekt', csvMilestone:'Meilenstein', csvPlannedMonth:'Geplanter Monat',
+    exTeams:[
+      {name:'Entwicklung',cap:20}, {name:'Design',cap:20}, {name:'QA/Test',cap:20}
+    ],
+  },
+  en: {
+    months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    title:'Project Scheduler',
+    githubTip:'⭐ Repo on GitHub', githubLabel:'Star on GitHub',
+    paypalTip:'Buy me a coffee ☕', paypalLabel:'Buy me a coffee',
+    ready:'ready', saving:'saving...', saved:'saved',
+    btnLoadCSV:'⬆ Load CSV', btnSaveCSV:'⬇ Save CSV',
+    btnExample:'◆ Load example', btnAddRow:'+ Row',
+    btnSchedule:'▶ Run scheduler', btnClear:'✕ Clear all',
+    panelCapacity:'Team Capacities (PD / month)',
+    panelData:'Project Data', panelGantt:'Schedule (Gantt)', panelAnalysis:'Analysis',
+    lblStart:'Start:', lblYear:'Year:',
+    thProject:'Project', thMilestone:'Milestone',
+    phProject:'Project', phMilestone:'Milestone',
+    addTeam:'+ Team',
+    entries: n => `${n} entries`,
+    emptyState:'No data yet. Load a CSV or click <code>Load example</code>.',
+    schedInfo:(m,p) => `${m} months · ${p} projects`,
+    capUtilTitle:'Capacity Utilization',
+    warnOver:(name,lbl,used,cap,pct) => `⚠ ${name} in ${lbl}: ${used} PD planned, only ${cap} PD available (${pct}%)`,
+    warnOk:'✓ All teams within capacity limits',
+    toastCSVLoaded: n => `CSV loaded — ${n} rows`,
+    toastCSVExported:'CSV exported', toastNoData:'No data available',
+    toastNoExport:'No data to export',
+    toastExampleLoaded:'Example data loaded', toastCleared:'Data cleared',
+    toastScheduled:'Scheduling complete', confirmClear:'Delete all data?',
+    toastMinTeam:'At least one team required',
+    disclaimer:'🔒 All data is stored exclusively in your browser\'s local storage. No data is ever sent to a server.',
+    csvProject:'Project', csvMilestone:'Milestone', csvPlannedMonth:'Planned Month',
+    exTeams:[
+      {name:'Development',cap:20}, {name:'Design',cap:20}, {name:'QA/Testing',cap:20}
+    ],
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+//  State  — teams are now dynamic!
+// ═══════════════════════════════════════════════════════
+let _nextId = 1;
+function newId() { return 't' + (_nextId++); }
+
+let state = {
+  // Each team: { id, name, capacity, color }
+  teams: [
+    { id:'t1', name:'Team A', capacity:20, color:PALETTE[0] },
+    { id:'t2', name:'Team B', capacity:20, color:PALETTE[1] },
+    { id:'t3', name:'Team C', capacity:20, color:PALETTE[2] },
+  ],
+  // Each row: { project, milestone, efforts: { t1:10, t2:5, ... } }
+  rows: [],
+  startMonth: 0,
+  startYear: 2026,
+  schedule: null,
+  lang: 'de',
+  _nextId: 4
+};
+
+function L(k) { return i18n[state.lang][k]; }
+function esc(s) { return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// ═══════════════════════════════════════════════════════
+//  LocalStorage
+// ═══════════════════════════════════════════════════════
+let storageOk = false;
+try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); storageOk = true; } catch(e) {}
+
+function saveState() {
+  if (!storageOk) return;
+  try {
+    state._nextId = _nextId;
+    const dot = document.getElementById('saveDot');
+    const st  = document.getElementById('saveStatus');
+    dot.classList.add('saving'); st.textContent = L('saving');
+    localStorage.setItem('scheduler_v2', JSON.stringify(state));
+    setTimeout(() => {
+      dot.classList.remove('saving');
+      st.textContent = L('saved')+' '+new Date().toLocaleTimeString(state.lang==='de'?'de-DE':'en-US');
+    }, 300);
+  } catch(e) {}
+}
+
+function loadState() {
+  if (!storageOk) return false;
+  try {
+    const d = localStorage.getItem('scheduler_v2');
+    if (d) {
+      const loaded = JSON.parse(d);
+      state = { ...state, ...loaded };
+      _nextId = state._nextId || 4;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+setInterval(saveState, 5000);
+
+// ═══════════════════════════════════════════════════════
+//  Team Management
+// ═══════════════════════════════════════════════════════
+function addTeam() {
+  const id = newId();
+  const colorIdx = state.teams.length % PALETTE.length;
+  state.teams.push({ id, name: 'Team ' + state.teams.length, capacity: 20, color: PALETTE[colorIdx] });
+  // Add zero effort for this team to all existing rows
+  state.rows.forEach(r => { r.efforts[id] = 0; });
+  state.schedule = null;
+  renderCapacity();
+  renderTableHeaders();
+  renderTable();
+  hideSchedule();
+}
+
+function removeTeam(id) {
+  if (state.teams.length <= 1) { toast(L('toastMinTeam')); return; }
+  state.teams = state.teams.filter(t => t.id !== id);
+  // Remove effort data from rows
+  state.rows.forEach(r => { delete r.efforts[id]; });
+  state.schedule = null;
+  renderCapacity();
+  renderTableHeaders();
+  renderTable();
+  hideSchedule();
+}
+
+function hideSchedule() {
+  document.getElementById('ganttPanel').style.display = 'none';
+  document.getElementById('warnPanel').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════
+//  SVG Icons
+// ═══════════════════════════════════════════════════════
+const GH='<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>';
+const PP='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 2.56A.859.859 0 0 1 5.79 1.84h5.943c2.604 0 4.473.53 5.467 1.624.468.515.756 1.058.907 1.707.159.681.164 1.497.01 2.494l-.013.083v.73l.57.326a3.4 3.4 0 0 1 1.024.852c.308.39.522.862.636 1.397.118.554.118 1.204-.005 1.929-.14.836-.403 1.563-.787 2.16a4.55 4.55 0 0 1-1.325 1.403c-.521.353-1.14.614-1.842.774a9.226 9.226 0 0 1-2.27.263h-.539a1.63 1.63 0 0 0-1.611 1.376l-.04.219-.682 4.321-.03.156a.158.158 0 0 1-.158.135H7.076z"/></svg>';
+
+// ═══════════════════════════════════════════════════════
+//  Render: Header + Toolbar
+// ═══════════════════════════════════════════════════════
+function renderHeader() {
+  document.getElementById('appHeader').innerHTML = `
+    <header>
+      <h1><span>//</span> ${L('title')}</h1>
+      <div class="header-right">
+        <a href="https://github.com/mindactuate/multi-project-milestone-calculator" target="_blank" class="header-link" title="${L('githubTip')}">${GH}<span>${L('githubLabel')}</span></a>
+        <a href="https://paypal.me/mindactuate" target="_blank" class="header-link paypal-link" title="${L('paypalTip')}">${PP}<span>${L('paypalLabel')}</span></a>
+        <div class="lang-toggle">
+          <button onclick="setLang('de')" class="${state.lang==='de'?'active':''}">DE</button>
+          <button onclick="setLang('en')" class="${state.lang==='en'?'active':''}">EN</button>
+        </div>
+        <div class="save-indicator"><div class="save-dot" id="saveDot"></div><span id="saveStatus">${L('ready')}</span></div>
+      </div>
+    </header>`;
+}
+
+function renderToolbar() {
+  document.getElementById('appToolbar').innerHTML = `
+    <div class="toolbar">
+      <button class="btn" onclick="document.getElementById('csvInput').click()">${L('btnLoadCSV')}</button>
+      <button class="btn" onclick="exportCSV()">${L('btnSaveCSV')}</button>
+      <button class="btn" onclick="loadExample()">${L('btnExample')}</button>
+      <button class="btn" onclick="addRow()">${L('btnAddRow')}</button>
+      <button class="btn primary" onclick="runScheduler()">${L('btnSchedule')}</button>
+      <button class="btn danger" onclick="clearAll()">${L('btnClear')}</button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Language Switch
+// ═══════════════════════════════════════════════════════
+function setLang(lang) {
+  state.lang = lang;
+  document.documentElement.lang = lang;
+  document.title = L('title');
+  renderAll();
+  saveState();
+}
+
+function renderAll() {
+  renderHeader();
+  renderToolbar();
+  renderStaticLabels();
+  renderFooter();
+  renderMonthSelector();
+  renderCapacity();
+  renderTableHeaders();
+  renderTable();
+  if (state.schedule) renderGantt();
+}
+
+function renderStaticLabels() {
+  document.getElementById('panelCapTitle').textContent    = L('panelCapacity');
+  document.getElementById('panelDataTitle').textContent   = L('panelData');
+  document.getElementById('panelGanttTitle').textContent  = L('panelGantt');
+  document.getElementById('panelAnalysisTitle').textContent= L('panelAnalysis');
+  document.getElementById('lblStart').textContent = L('lblStart');
+  document.getElementById('lblYear').textContent  = L('lblYear');
+}
+
+function renderFooter() {
+  document.getElementById('appFooter').className = 'app-footer';
+  document.getElementById('appFooter').textContent = L('disclaimer');
+}
+
+function renderMonthSelector() {
+  const sel = document.getElementById('startMonth');
+  sel.innerHTML = '';
+  L('months').forEach((m,i) => { const o=document.createElement('option'); o.value=i; o.textContent=m; sel.appendChild(o); });
+  sel.value = state.startMonth;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Capacity UI  — dynamic teams
+// ═══════════════════════════════════════════════════════
+function renderCapacity() {
+  const g = document.getElementById('capacityGrid');
+  g.innerHTML = '';
+  state.teams.forEach((team, idx) => {
+    const c = document.createElement('div');
+    c.className = 'cap-card';
+    c.innerHTML = `
+      <div class="cap-badge" style="background:${team.color}" title="Klick für Farbe"
+           onclick="cycleColor('${team.id}')">${idx+1}</div>
+      <input type="text" class="cap-name-input" value="${esc(team.name)}"
+             onchange="updateTeam('${team.id}','name',this.value)">
+      <input type="number" class="cap-num-input" min="1" value="${team.capacity}"
+             onchange="updateTeam('${team.id}','capacity',parseInt(this.value)||1)">
+      <span class="cap-unit">PT</span>
+      <button class="cap-del" onclick="removeTeam('${team.id}')" title="Team entfernen">×</button>`;
+    g.appendChild(c);
+  });
+  // Add team button
+  const addBtn = document.createElement('div');
+  addBtn.className = 'cap-add';
+  addBtn.onclick = addTeam;
+  addBtn.textContent = L('addTeam');
+  g.appendChild(addBtn);
+}
+
+function updateTeam(id, prop, val) {
+  const team = state.teams.find(t => t.id === id);
+  if (team) { team[prop] = val; renderTableHeaders(); }
+}
+
+function cycleColor(id) {
+  const team = state.teams.find(t => t.id === id);
+  if (!team) return;
+  const idx = PALETTE.indexOf(team.color);
+  team.color = PALETTE[(idx + 1) % PALETTE.length];
+  renderCapacity();
+  if (state.schedule) renderGantt();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Table  — dynamic columns
+// ═══════════════════════════════════════════════════════
+function renderTableHeaders() {
+  const tr = document.getElementById('tableHead');
+  tr.innerHTML = `<th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
+  state.teams.forEach(team => {
+    tr.innerHTML += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`;
+  });
+  tr.innerHTML += '<th style="width:40px"></th>';
+}
+
+function renderTable() {
+  const body  = document.getElementById('dataBody');
+  const empty = document.getElementById('emptyState');
+  body.innerHTML = '';
+
+  if (state.rows.length === 0) {
+    empty.style.display = '';
+    empty.innerHTML = L('emptyState');
+    document.getElementById('rowCount').textContent = L('entries')(0);
+    return;
+  }
+
+  empty.style.display = 'none';
+  document.getElementById('rowCount').textContent = L('entries')(state.rows.length);
+
+  state.rows.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    let html = `
+      <td><input type="text" value="${esc(row.project)}" onchange="state.rows[${i}].project=this.value" placeholder="${L('phProject')}"></td>
+      <td><input type="text" value="${esc(row.milestone)}" onchange="state.rows[${i}].milestone=this.value" placeholder="${L('phMilestone')}"></td>`;
+    state.teams.forEach(team => {
+      const val = row.efforts[team.id] || 0;
+      html += `<td><input type="number" min="0" value="${val}" onchange="state.rows[${i}].efforts['${team.id}']=parseFloat(this.value)||0"></td>`;
+    });
+    html += `<td><button class="row-del" onclick="deleteRow(${i})">×</button></td>`;
+    tr.innerHTML = html;
+    body.appendChild(tr);
+  });
+}
+
+function addRow() {
+  const efforts = {};
+  state.teams.forEach(t => { efforts[t.id] = 0; });
+  state.rows.push({ project:'', milestone:'', efforts });
+  renderTable();
+}
+
+function deleteRow(i) {
+  state.rows.splice(i, 1);
+  renderTable();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CSV Import / Export  — dynamic teams
+// ═══════════════════════════════════════════════════════
+function importCSV(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = e => {
+    parseCSV(e.target.result);
+    renderCapacity();
+    renderTableHeaders();
+    renderTable();
+    toast(L('toastCSVLoaded')(state.rows.length));
+  };
+  r.readAsText(file);
+  ev.target.value = '';
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return;
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g,''));
+
+  // Detect team columns: everything after first 2 cols that looks like a PT column
+  // Strip " (PT)" or " (PD)" suffix to get team name
+  const teamCols = [];
+  for (let c = 2; c < headers.length; c++) {
+    const h = headers[c];
+    if (/geplanter|planned/i.test(h)) break; // stop at planned month column
+    const name = h.replace(/\s*\(P[TD]\)\s*$/i, '').trim();
+    if (name) teamCols.push({ colIdx: c, name });
+  }
+
+  // Rebuild teams from CSV headers
+  if (teamCols.length > 0) {
+    state.teams = teamCols.map((tc, i) => ({
+      id: 't' + (i + 1),
+      name: tc.name,
+      capacity: 20,
+      color: PALETTE[i % PALETTE.length]
+    }));
+    _nextId = teamCols.length + 1;
+  }
+
+  state.rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g,''));
+    if (cols.length < 3) continue;
+    const efforts = {};
+    state.teams.forEach((team, ti) => {
+      efforts[team.id] = parseFloat(cols[teamCols[ti]?.colIdx]) || 0;
+    });
+    state.rows.push({ project: cols[0]||'', milestone: cols[1]||'', efforts });
+  }
+  state.schedule = null;
+}
+
+function exportCSV() {
+  if (state.rows.length === 0) { toast(L('toastNoExport')); return; }
+  const mo = L('months');
+
+  let csv = `${L('csvProject')};${L('csvMilestone')}`;
+  state.teams.forEach(t => { csv += `;${t.name} (PT)`; });
+  if (state.schedule) csv += `;${L('csvPlannedMonth')}`;
+  csv += '\n';
+
+  state.rows.forEach((r, i) => {
+    let line = `${r.project};${r.milestone}`;
+    state.teams.forEach(t => { line += `;${r.efforts[t.id]||0}`; });
+    if (state.schedule && state.schedule[i] !== undefined) {
+      const m  = state.schedule[i];
+      const mi = (state.startMonth + m) % 12;
+      const yr = state.startYear + Math.floor((state.startMonth + m) / 12);
+      line += `;${mo[mi]} ${yr}`;
+    }
+    csv += line + '\n';
+  });
+
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='projektplan.csv'; a.click();
+  URL.revokeObjectURL(url);
+  toast(L('toastCSVExported'));
+}
+
+// ═══════════════════════════════════════════════════════
+//  Scheduler Algorithm  — dynamic teams
+// ═══════════════════════════════════════════════════════
+function runScheduler() {
+  if (state.rows.length === 0) { toast(L('toastNoData')); return; }
+  syncRowsFromTable();
+
+  const projects = {}, order = [];
+  state.rows.forEach((r,i) => {
+    if (!projects[r.project]) { projects[r.project]=[]; order.push(r.project); }
+    projects[r.project].push({ ...r, idx:i });
+  });
+
+  // used[month][teamId] = PT used
+  const used = {};
+  const getU = (m, tid) => (used[m]&&used[m][tid]) || 0;
+  const addU = (m, tid, v) => { if (!used[m]) { used[m]={}; state.teams.forEach(t=>{used[m][t.id]=0;}); } used[m][tid]+=v; };
+
+  function fits(m, efforts) {
+    return state.teams.every(t => {
+      const need = efforts[t.id] || 0;
+      return need <= 0 || getU(m, t.id) + need <= t.capacity;
+    });
+  }
+
+  const schedule = new Array(state.rows.length).fill(0);
+  const MAX = 48;
+
+  order.forEach(proj => {
+    let earliest = 0;
+    projects[proj].forEach(ms => {
+      let m = earliest;
+      while (m < MAX && !fits(m, ms.efforts)) m++;
+      if (m >= MAX) m = MAX - 1;
+      schedule[ms.idx] = m;
+      state.teams.forEach(t => { const n=ms.efforts[t.id]||0; if(n>0) addU(m,t.id,n); });
+      earliest = m + 1;
+    });
+  });
+
+  state.schedule = schedule;
+  state.usedCapacity = used;
+  renderGantt();
+  saveState();
+  toast(L('toastScheduled'));
+}
+
+function syncRowsFromTable() {
+  document.querySelectorAll('#dataBody tr').forEach((tr, i) => {
+    const inp = tr.querySelectorAll('input');
+    if (!state.rows[i]) return;
+    state.rows[i].project   = inp[0].value;
+    state.rows[i].milestone = inp[1].value;
+    state.teams.forEach((team, ti) => {
+      state.rows[i].efforts[team.id] = parseFloat(inp[2 + ti]?.value) || 0;
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Gantt
+// ═══════════════════════════════════════════════════════
+const GANTT_COLORS = ['#4e9af5','#f59e0b','#34d399','#a78bfa','#f472b6','#22d3ee','#f97316','#6366f1'];
+
+function renderGantt() {
+  if (!state.schedule) return;
+  document.getElementById('ganttPanel').style.display = '';
+  const maxM = Math.max(...state.schedule) + 1;
+  const num  = Math.max(maxM, 6);
+  const mo   = L('months');
+
+  const pc={}; let ci=0;
+  state.rows.forEach(r => { if(!pc.hasOwnProperty(r.project)){pc[r.project]=ci%8;ci++;} });
+
+  let html = '<div class="gantt-header">';
+  for (let m=0;m<num;m++) {
+    const mi=(state.startMonth+m)%12;
+    const yr=state.startYear+Math.floor((state.startMonth+m)/12);
+    html+=`<div class="gantt-month">${mo[mi]} ${String(yr).slice(2)}</div>`;
+  }
+  html+='</div>';
+
+  state.rows.forEach((row,i) => {
+    const m=state.schedule[i];
+    html+=`<div class="gantt-row"><div class="gantt-label"><span class="proj-tag">${esc(row.project)}</span>${esc(row.milestone)}</div><div class="gantt-bars">`;
+    for (let j=0;j<num;j++) {
+      html+=`<div class="gantt-cell">`;
+      if (j===m) {
+        let tot=0; state.teams.forEach(t=>{tot+=row.efforts[t.id]||0;});
+        html+=`<div class="gantt-bar" style="background:${GANTT_COLORS[pc[row.project]]}">${tot>0?tot+'PT':''}</div>`;
+      }
+      html+='</div>';
+    }
+    html+='</div></div>';
+  });
+
+  document.getElementById('ganttChart').innerHTML = html;
+  renderCapOverview(num);
+  renderWarnings(num);
+  document.getElementById('schedInfo').textContent = L('schedInfo')(num, Object.keys(pc).length);
+}
+
+function renderCapOverview(num) {
+  const mo = L('months');
+  let html = `<h3 style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">${L('capUtilTitle')}</h3>`;
+
+  state.teams.forEach(team => {
+    html += `<div class="cap-row"><div class="cap-row-label"><div class="cap-badge" style="background:${team.color};width:22px;height:22px;font-size:10px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-weight:700;">&nbsp;</div> ${esc(team.name)}</div><div class="cap-cells">`;
+    for (let m=0;m<num;m++) {
+      const u=(state.usedCapacity&&state.usedCapacity[m]&&state.usedCapacity[m][team.id])||0;
+      const cap=team.capacity;
+      const pct=cap>0?Math.round(u/cap*100):0;
+      const w=Math.min(pct,100);
+      const over=pct>100;
+      html+=`<div class="cap-cell" title="${esc(team.name)}: ${u}/${cap} PT (${pct}%)"><div class="cap-fill${over?' over':''}" style="width:${w}%;background:${over?'var(--red)':team.color};">${pct>30?`<span class="cap-pct">${pct}%</span>`:''}</div></div>`;
+    }
+    html+='</div></div>';
+  });
+  document.getElementById('capOverview').innerHTML = html;
+}
+
+function renderWarnings(num) {
+  const mo=L('months'), w=[];
+  for (let m=0;m<num;m++) {
+    state.teams.forEach(team => {
+      const u=(state.usedCapacity&&state.usedCapacity[m]&&state.usedCapacity[m][team.id])||0;
+      const cap=team.capacity;
+      const mi=(state.startMonth+m)%12;
+      const yr=state.startYear+Math.floor((state.startMonth+m)/12);
+      if (u>cap) w.push({type:'over',text:L('warnOver')(team.name,`${mo[mi]} ${yr}`,u,cap,Math.round(u/cap*100))});
+    });
+  }
+  if (w.length===0) w.push({type:'ok',text:L('warnOk')});
+  document.getElementById('warnPanel').style.display='';
+  document.getElementById('warnings').innerHTML=w.map(x=>`<li class="${x.type}">${x.text}</li>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Example Data
+// ═══════════════════════════════════════════════════════
+function loadExample() {
+  const ex = L('exTeams');
+  state.teams = ex.map((t,i) => ({ id:'t'+(i+1), name:t.name, capacity:t.cap, color:PALETTE[i%PALETTE.length] }));
+  _nextId = ex.length + 1;
+
+  const e = (a,b,c) => ({t1:a,t2:b,t3:c});
+  state.rows = [
+    {project:'Webshop',milestone:'Konzept',efforts:e(10,5,0)},
+    {project:'Webshop',milestone:'Entwicklung',efforts:e(15,0,8)},
+    {project:'Webshop',milestone:'Test & Go-Live',efforts:e(5,3,12)},
+    {project:'CRM Migration',milestone:'Analyse',efforts:e(0,12,4)},
+    {project:'CRM Migration',milestone:'Datenmigration',efforts:e(8,18,6)},
+    {project:'CRM Migration',milestone:'Rollout',efforts:e(3,10,10)},
+    {project:'API Gateway',milestone:'Design',efforts:e(12,0,0)},
+    {project:'API Gateway',milestone:'Implementierung',efforts:e(20,5,3)},
+    {project:'Mobile App',milestone:'UX Design',efforts:e(0,8,6)},
+    {project:'Mobile App',milestone:'Entwicklung',efforts:e(10,15,10)},
+    {project:'Mobile App',milestone:'Launch',efforts:e(5,5,15)},
+    {project:'Data Warehouse',milestone:'Architektur',efforts:e(14,0,3)},
+    {project:'Data Warehouse',milestone:'ETL Pipelines',efforts:e(18,4,10)},
+    {project:'Compliance',milestone:'Audit',efforts:e(0,10,15)},
+    {project:'Compliance',milestone:'Umsetzung',efforts:e(6,12,8)},
+    {project:'Intranet',milestone:'Redesign',efforts:e(8,10,5)},
+    {project:'Intranet',milestone:'Content Migration',efforts:e(3,15,4)},
+    {project:'IoT Dashboard',milestone:'Prototyp',efforts:e(12,6,4)},
+    {project:'IoT Dashboard',milestone:'Produktivsystem',efforts:e(16,8,12)},
+  ];
+  state.schedule = null;
+  renderCapacity();
+  renderTableHeaders();
+  renderTable();
+  hideSchedule();
+  toast(L('toastExampleLoaded'));
+}
+
+function clearAll() {
+  if (!confirm(L('confirmClear'))) return;
+  state.rows=[];
+  state.schedule=null;
+  state.usedCapacity=null;
+  renderTable();
+  hideSchedule();
+  saveState();
+  toast(L('toastCleared'));
+}
+
+// ═══════════════════════════════════════════════════════
+//  Toast
+// ═══════════════════════════════════════════════════════
+function toast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// ═══════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════
+(function init() {
+  const loaded = loadState();
+  renderAll();
+
+  document.getElementById('startMonth').addEventListener('change', function() {
+    state.startMonth = parseInt(this.value);
+    if (state.schedule) runScheduler();
+  });
+  document.getElementById('startYear').addEventListener('change', function() {
+    state.startYear = parseInt(this.value)||2026;
+    if (state.schedule) runScheduler();
+  });
+  document.getElementById('startMonth').value = state.startMonth;
+  document.getElementById('startYear').value  = state.startYear;
+
+  if (loaded && state.schedule) renderGantt();
+})();
+</script>
+</body>
+</html>
