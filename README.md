@@ -52,10 +52,12 @@ The result is a **Gantt chart** with a **capacity utilization heatmap** and auto
 - All labels, buttons, tooltips, warnings, CSV headers, and toasts are translated
 - Language preference is persisted
 
-### Privacy
+### Privacy & Legal
 - **100% client-side** — all data stays in your browser's `localStorage`
 - No server, no cookies, no tracking, no analytics
-- No external API calls — the only external resources are Google Fonts
+- **No external resources** — no Google Fonts, no CDN calls, no tracking pixels
+- System fonts only (SF Mono, Segoe UI, etc.) — zero network requests beyond the HTML itself
+- Built-in **Impressum** (Legal Notice) and **Datenschutzerklärung** (Privacy Policy) modals with placeholder templates ready for your details — required for DSGVO/GDPR compliance when hosting in Germany
 
 ---
 
@@ -107,8 +109,9 @@ This is a **greedy heuristic**, not an optimal solver. It works well for typical
 ## Tech Stack
 
 - **Zero dependencies** — single HTML file, vanilla JavaScript, CSS
-- **Google Fonts** — JetBrains Mono + DM Sans (loaded via CDN)
+- **System fonts** — no external font loading (DSGVO-compliant, no Google Fonts CDN)
 - **No build step** — no npm, no bundler, no framework
+- **No external requests** — the HTML file is completely self-contained
 - Tested in Chrome, Firefox, Safari, Edge
 
 ---
