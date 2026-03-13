@@ -206,7 +206,7 @@
 //  Palette & Icons
 // ═══════════════════════════════════════════════════════
 const PALETTE = ['#4e9af5','#f59e0b','#34d399','#a78bfa','#f472b6','#22d3ee','#f97316','#6366f1','#e879f9','#84cc16','#fb923c','#2dd4bf','#f43f5e','#818cf8','#fbbf24'];
-const GANTT_COLORS = ['#4e9af5','#f59e0b','#34d399','#a78bfa','#f472b6','#22d3ee','#f97316','#6366f1'];
+const GANTT_COLORS = ['#7c6fcd','#c2785c','#4a9e8f','#c75b8e','#8fa844','#c9953e','#5b8ebf','#b35d5d','#6aab9a','#9b7db8','#cb8c3e','#5c84a8'];
 const GH='<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>';
 const PP='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 2.56A.859.859 0 0 1 5.79 1.84h5.943c2.604 0 4.473.53 5.467 1.624.468.515.756 1.058.907 1.707.159.681.164 1.497.01 2.494l-.013.083v.73l.57.326a3.4 3.4 0 0 1 1.024.852c.308.39.522.862.636 1.397.118.554.118 1.204-.005 1.929-.14.836-.403 1.563-.787 2.16a4.55 4.55 0 0 1-1.325 1.403c-.521.353-1.14.614-1.842.774a9.226 9.226 0 0 1-2.27.263h-.539a1.63 1.63 0 0 0-1.611 1.376l-.04.219-.682 4.321-.03.156a.158.158 0 0 1-.158.135H7.076z"/></svg>';
 
@@ -680,7 +680,8 @@ function runScheduler() {
   }
 
   // For a given team, find eligible milestones (max 1 per project)
-  function getEligible(teamId) {
+  // doneBeforeMonth: Set of milestone indices fully complete BEFORE this month
+  function getEligible(teamId, doneBeforeMonth) {
     const eligible = [];
     order.forEach(proj => {
       const milestones = projects[proj];
@@ -692,20 +693,18 @@ function runScheduler() {
         if (mi > 0) {
           const prevIdx = milestones[mi - 1].idx;
           if (row.canOverlap === false) {
-            // Strict: previous milestone must be FULLY complete (all teams)
-            if (!isMsDone(prevIdx)) {
-              // Can't pass this milestone — check if team has work on prev
+            // 🔒 Strict: predecessor must have been done BEFORE this month
+            if (!doneBeforeMonth.has(prevIdx)) {
               if (rem[prevIdx][teamId] > 0) eligible.push(prevIdx);
               break;
             }
           } else {
-            // Overlap allowed: team can pass if it's done with prev
+            // 🔓 Overlap: team can pass if personally done with prev
             if (rem[prevIdx][teamId] > 0) { eligible.push(prevIdx); break; }
           }
         }
 
         if (!teamDone) { eligible.push(idx); break; }
-        // Team done with this milestone, continue to next
       }
     });
     return eligible;
@@ -715,25 +714,26 @@ function runScheduler() {
   for (let month = 0; month < MAX; month++) {
     if (allDone()) break;
 
+    // Snapshot: milestones fully complete BEFORE this month begins
+    const doneBeforeMonth = new Set();
+    for (let i = 0; i < N; i++) { if (isMsDone(i)) doneBeforeMonth.add(i); }
+
     state.teams.forEach(team => {
       let cap = team.capacity;
       if (cap <= 0) return;
 
       if (state.strategy === 'speed') {
-        // Speed: all capacity to highest-priority eligible, spillover to next
-        // Re-evaluate after each milestone completes within the month
         let safety = 0;
         while (cap > 0.001 && safety++ < 50) {
-          const eligible = getEligible(team.id);
+          const eligible = getEligible(team.id, doneBeforeMonth);
           if (eligible.length === 0) break;
-          const idx = eligible[0]; // highest priority
+          const idx = eligible[0];
           const spent = allocate(month, idx, team.id, cap);
           cap -= spent;
           if (spent === 0) break;
         }
       } else {
-        // Parallel: distribute capacity proportionally across eligible milestones
-        const eligible = getEligible(team.id);
+        const eligible = getEligible(team.id, doneBeforeMonth);
         if (eligible.length === 0) return;
         const totalNeed = eligible.reduce((s, idx) => s + rem[idx][team.id], 0);
         if (totalNeed <= 0) return;
