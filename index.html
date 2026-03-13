@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Projekt-Scheduler</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0f1117; --bg2: #181b24; --bg3: #1e222e;
@@ -12,8 +11,8 @@
     --accent: #4e9af5; --accent2: #3b7dd8;
     --green: #34d399; --orange: #f59e0b; --red: #ef4444;
     --radius: 6px;
-    --mono: 'JetBrains Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Menlo, Consolas, 'Liberation Mono', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; line-height:1.5; }
@@ -123,6 +122,22 @@
   .toast.show { opacity:1; transform:translateY(0); }
 
   .app-footer { margin-top:32px; padding:16px 0; border-top:1px solid var(--border); text-align:center; font-family:var(--mono); font-size:11px; color:var(--text2); line-height:1.6; }
+  .footer-links { margin-top:8px; display:flex; justify-content:center; gap:16px; }
+  .footer-links a { color:var(--text2); text-decoration:none; font-family:var(--mono); font-size:11px; cursor:pointer; transition:color .15s; }
+  .footer-links a:hover { color:var(--accent); }
+
+  /* Legal Modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--bg2); border:1px solid var(--border); border-radius:10px; max-width:680px; width:90vw; max-height:80vh; overflow-y:auto; padding:32px; position:relative; }
+  .modal h2 { font-family:var(--mono); font-size:16px; font-weight:700; margin-bottom:16px; color:var(--text); }
+  .modal h3 { font-family:var(--mono); font-size:13px; font-weight:600; margin:20px 0 8px; color:var(--accent); }
+  .modal p, .modal li { font-size:13px; line-height:1.7; color:var(--text2); margin-bottom:8px; }
+  .modal ul { padding-left:20px; }
+  .modal a { color:var(--accent); }
+  .modal-close { position:sticky; top:0; float:right; width:32px; height:32px; border:none; background:var(--bg3); color:var(--text2); border-radius:6px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:1; }
+  .modal-close:hover { background:var(--red); color:#fff; }
+  .placeholder { background:var(--bg); border:1px dashed var(--orange); border-radius:4px; padding:8px 12px; font-family:var(--mono); font-size:12px; color:var(--orange); margin:8px 0; }
 
   ::-webkit-scrollbar { width:6px; height:6px; }
   ::-webkit-scrollbar-track { background:var(--bg); }
@@ -178,6 +193,17 @@
   </div>
   <footer id="appFooter"></footer>
 </div>
+
+<!-- Impressum Modal -->
+<div class="modal-overlay" id="modalImpressum" onclick="if(event.target===this)closeModal('modalImpressum')">
+  <div class="modal" id="modalImpressumContent"></div>
+</div>
+
+<!-- Datenschutz Modal -->
+<div class="modal-overlay" id="modalDatenschutz" onclick="if(event.target===this)closeModal('modalDatenschutz')">
+  <div class="modal" id="modalDatenschutzContent"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 <input type="file" id="csvInput" accept=".csv" onchange="importCSV(event)">
 
@@ -227,6 +253,7 @@ const i18n = {
     exTeams:[
       {name:'Entwicklung',cap:20}, {name:'Design',cap:20}, {name:'QA/Test',cap:20}
     ],
+    footerImpressum:'Impressum', footerDatenschutz:'Datenschutz',
   },
   en: {
     months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
@@ -260,6 +287,87 @@ const i18n = {
     exTeams:[
       {name:'Development',cap:20}, {name:'Design',cap:20}, {name:'QA/Testing',cap:20}
     ],
+    footerImpressum:'Legal Notice', footerDatenschutz:'Privacy Policy',
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+//  Legal Page Content (HTML)
+// ═══════════════════════════════════════════════════════
+const legalContent = {
+  impressum: {
+    de: `
+      <h2>Impressum</h2>
+      <h3>Angaben gemäß § 5 DDG</h3>
+      <div class="placeholder"><br>Daniel Gruner<br>Ludwig-Essinger-Str 1<br>74080 HN<br>Deutschland</div>
+      <h3>Kontakt</h3>
+      <div class="placeholder">dnlgrnr911[at]gmail.com</div>
+      <h3>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h3>
+      <div class="placeholder">Daniel Gruner<br>Adresse wie oben</div>
+      <h3>Haftung für Inhalte</h3>
+      <p>Als Diensteanbieter sind wir gemäß § 7 Abs.1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht unter Verpflichtung, übermittelte oder gespeicherte fremde Informationen zu überwachen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.</p>
+      <h3>Haftung für Links</h3>
+      <p>Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter verantwortlich.</p>
+    `,
+    en: `
+      <h2>Legal Notice (Impressum)</h2>
+      <h3>Information according to § 5 DDG (German Digital Services Act)</h3>
+      <div class="placeholder"><br>Daniel Gruner<br>Ludwig-Essinger-Str 1<br>74080 HN<br>Germany</div>
+      <h3>Contact</h3>
+      <div class="placeholder">dnlgrnr911[at]gmail.com</div>
+      <h3>Responsible for content according to § 18 Abs. 2 MStV</h3>
+      <div class="placeholder">Daniel Gruner<br>Address as above</div>
+      <h3>Liability for Content</h3>
+      <p>As a service provider, we are responsible for our own content on these pages in accordance with general legislation pursuant to § 7 (1) DDG. However, according to §§ 8 to 10 DDG, we are not obligated to monitor transmitted or stored third-party information.</p>
+      <h3>Liability for Links</h3>
+      <p>Our site contains links to external websites of third parties over whose content we have no influence. Therefore, we cannot assume any liability for this external content.</p>
+    `
+  },
+  datenschutz: {
+    de: `
+      <h2>Datenschutzerklärung</h2>
+      <h3>1. Verantwortlicher</h3>
+      <div class="placeholder">Daniel Gruner<br>Ludwig-Essinger-Str. 1, 74080 HN<br>E-Mail: dnlgrnr911@gmail.com</div>
+
+      <h3>2. Hosting</h3>
+      <p>Diese Website wird über <strong>GitHub Pages</strong> gehostet von GitHub Inc., 88 Colin P Kelly Jr St, San Francisco, CA 94107, USA.</p>
+      <p>Beim Besuch dieser Website erfasst GitHub automatisch technische Daten in Server-Logfiles (u.a. IP-Adresse, Browsertyp, Zeitpunkt des Zugriffs). Dies ist erforderlich, um die Website anzuzeigen und die Stabilität und Sicherheit zu gewährleisten. Rechtsgrundlage ist Art. 6 Abs. 1 S. 1 lit. f DSGVO (berechtigtes Interesse). Wir haben auf diese Daten keinen direkten Zugriff. Es erfolgt kein Tracking durch uns.</p>
+      <p>Da GitHub in den USA ansässig ist, erfolgt eine Übermittlung in ein Drittland. GitHub hat sich den EU-Standardvertragsklauseln verpflichtet. Weitere Informationen: <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank">GitHub Privacy Statement</a></p>
+
+      <h3>3. Lokale Datenspeicherung (localStorage)</h3>
+      <p>Diese Anwendung speichert alle von Ihnen eingegebenen Daten (Projekte, Meilensteine, Team-Konfigurationen) ausschließlich <strong>lokal in Ihrem Browser</strong> über die localStorage-API. Es werden <strong>keine Daten an uns oder Dritte übermittelt</strong>. Die Daten verbleiben vollständig auf Ihrem Gerät und können jederzeit über die Browser-Einstellungen oder die „Alles löschen"-Funktion der App entfernt werden.</p>
+
+      <h3>4. Keine Cookies</h3>
+      <p>Diese Website verwendet keine Cookies.</p>
+
+      <h3>5. Keine externen Ressourcen</h3>
+      <p>Diese Website lädt keine externen Schriftarten, Skripte, Tracking-Pixel oder sonstige Ressourcen von Drittanbietern. Die Anwendung ist vollständig in einer einzigen HTML-Datei enthalten.</p>
+
+      <h3>6. Ihre Rechte</h3>
+      <p>Sie haben gemäß DSGVO das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21). Da wir selbst keine personenbezogenen Daten verarbeiten, beziehen sich diese Rechte bezüglich des Hostings auf GitHub. Sie haben zudem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren (Art. 77 DSGVO).</p>
+    `,
+    en: `
+      <h2>Privacy Policy</h2>
+      <h3>1. Data Controller</h3>
+      <div class="placeholder">Daniel Gruner<br>Ludwig-Essinger-Str. 1, 74080 HN<br>E-Mail: dnlgrnr911@gmail.com</div>
+
+      <h3>2. Hosting</h3>
+      <p>This website is hosted via <strong>GitHub Pages</strong> by GitHub Inc., 88 Colin P Kelly Jr St, San Francisco, CA 94107, USA.</p>
+      <p>When visiting this website, GitHub automatically collects technical data in server log files (including IP address, browser type, time of access). This is necessary to display the website and ensure stability and security. Legal basis: Art. 6(1)(f) GDPR (legitimate interest). We have no direct access to this data. No tracking is performed by us.</p>
+      <p>As GitHub is based in the USA, data is transferred to a third country. GitHub has committed to EU Standard Contractual Clauses. More information: <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank">GitHub Privacy Statement</a></p>
+
+      <h3>3. Local Data Storage (localStorage)</h3>
+      <p>This application stores all data you enter (projects, milestones, team configurations) <strong>exclusively in your browser</strong> via the localStorage API. <strong>No data is transmitted to us or any third party.</strong> Data remains entirely on your device and can be deleted at any time via browser settings or the app's "Clear all" function.</p>
+
+      <h3>4. No Cookies</h3>
+      <p>This website does not use any cookies.</p>
+
+      <h3>5. No External Resources</h3>
+      <p>This website does not load any external fonts, scripts, tracking pixels, or other third-party resources. The application is entirely self-contained in a single HTML file.</p>
+
+      <h3>6. Your Rights</h3>
+      <p>Under GDPR, you have the right to access (Art. 15), rectification (Art. 16), erasure (Art. 17), restriction of processing (Art. 18), data portability (Art. 20), and objection (Art. 21). Since we do not process personal data ourselves, these rights regarding hosting relate to GitHub. You also have the right to lodge a complaint with a data protection supervisory authority (Art. 77 GDPR).</p>
+    `
   }
 };
 
@@ -428,9 +536,34 @@ function renderStaticLabels() {
 }
 
 function renderFooter() {
-  document.getElementById('appFooter').className = 'app-footer';
-  document.getElementById('appFooter').textContent = L('disclaimer');
+  const f = document.getElementById('appFooter');
+  f.className = 'app-footer';
+  f.innerHTML = `
+    ${L('disclaimer')}
+    <div class="footer-links">
+      <a onclick="openModal('impressum')">${L('footerImpressum')}</a>
+      <a onclick="openModal('datenschutz')">${L('footerDatenschutz')}</a>
+    </div>`;
 }
+
+function openModal(type) {
+  const id = type === 'impressum' ? 'modalImpressum' : 'modalDatenschutz';
+  const contentId = id + 'Content';
+  document.getElementById(contentId).innerHTML =
+    '<button class="modal-close" onclick="closeModal(\'' + id + '\')">×</button>' +
+    legalContent[type][state.lang];
+  document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  }
+});
 
 function renderMonthSelector() {
   const sel = document.getElementById('startMonth');
