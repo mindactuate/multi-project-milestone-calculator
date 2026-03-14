@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find d:Codemulti-project-milestone-calculatormulti-project-milestone-calculator -type f -name *.html -o -name *.json -o -name *.md)"
+    ]
+  }
+}

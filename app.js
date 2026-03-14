@@ -20,7 +20,7 @@ const i18n = {
     btnExample:'◆ Beispiel laden', btnAddRow:'+ Zeile',
     btnSchedule:'▶ Scheduling starten', btnClear:'✕ Alles löschen',
     stratParallel:'⇉ Parallel', stratSpeed:'⚡ Speed',
-    stratParallelTip:'Alle Projekte gleichzeitig — freie Kapazität wird verteilt',
+    stratParallelTip:'Mehrere Projekte gleichzeitig — Kapazität proportional verteilt. N steuert wie viele.',
     stratSpeedTip:'Höchste Prio zuerst komplett abarbeiten',
     overlapTip:'Wenn aktiv: Team kann nächsten Meilenstein starten sobald es selbst fertig ist, auch wenn andere Teams noch am vorherigen arbeiten',
     thWait:'Wartet',
@@ -35,7 +35,9 @@ const i18n = {
     addTeam:'+ Team',
     entries: n => `${n} Einträge`,
     emptyState:'Noch keine Daten. Lade ein CSV oder klicke <code>Beispiel laden</code>.',
-    schedInfo:(m,p,s) => `${m} Monate · ${p} Projekte · ${s==='parallel'?'⇉ Parallel':'⚡ Speed'}`,
+    schedInfo:(m,p,s,n) => `${m} Monate · ${p} Projekte · ${s==='parallel'?`⇉ ${n===0?'∞':n} parallel`:'⚡ Speed'}`,
+    parallelNLabel: n => n === 0 ? '∞' : String(n),
+    parallelNTip: n => n === 0 ? 'Alle Projekte gleichzeitig (nicht empfohlen bei > 4 Projekten)' : `Maximal ${n} Projekte gleichzeitig aktiv`,
     capUtilTitle:'Kapazitätsauslastung',
     capUtilHint:'Zur Bearbeitung einzelner Monate die Kapazitäts-Tabelle oben verwenden.',
     capMonthlyHint:'Standard-Wert gilt für alle Monate. Einzelne Monate überschreiben: Wert ändern (wird orange). Gleichen Wert wie Standard eingeben = Override entfernen.',
@@ -50,12 +52,15 @@ const i18n = {
     toastExampleLoaded:'Beispieldaten geladen', toastCleared:'Daten gelöscht',
     toastScheduled:'Scheduling abgeschlossen', confirmClear:'Alle Daten löschen?',
     toastMinTeam:'Mindestens ein Team erforderlich',
+    toastEmptyNames:'Bitte alle Projekt- und Meilensteinnamen ausfüllen.',
+    toastStorageFull:'Speicher voll — Daten konnten nicht gespeichert werden.',
     btnShare:'⎘ Link teilen',
     toastShareCopied:'Link in Zwischenablage kopiert!',
     toastShareFailed:'Link konnte nicht kopiert werden.',
     disclaimer:'🔒 Alle Daten werden ausschließlich lokal in deinem Browser gespeichert (localStorage). Es werden keine Daten an einen Server gesendet.',
     csvProject:'Projekt', csvMilestone:'Meilenstein', csvPlannedMonth:'Geplanter Monat',
-    csvStart:'Start', csvEnd:'Ende',
+    csvStart:'Start', csvEnd:'Ende', csvWait:'Wartet', csvDep:'AbhängigVon',
+    thDep:'Abhängig von',
     exTeams:[{name:'Entwicklung',cap:20},{name:'Design',cap:20},{name:'QA/Test',cap:20}],
     footerImpressum:'Impressum', footerDatenschutz:'Datenschutz',
   },
@@ -69,7 +74,7 @@ const i18n = {
     btnExample:'◆ Load example', btnAddRow:'+ Row',
     btnSchedule:'▶ Run scheduler', btnClear:'✕ Clear all',
     stratParallel:'⇉ Parallel', stratSpeed:'⚡ Speed',
-    stratParallelTip:'All projects simultaneously — free capacity is distributed',
+    stratParallelTip:'Multiple projects simultaneously — capacity distributed proportionally. N controls how many.',
     stratSpeedTip:'Highest priority project completed first',
     overlapTip:'When active: a team can start the next milestone once it finishes, even if other teams are still working on the previous one',
     thWait:'Waits',
@@ -84,7 +89,9 @@ const i18n = {
     addTeam:'+ Team',
     entries: n => `${n} entries`,
     emptyState:'No data yet. Load a CSV or click <code>Load example</code>.',
-    schedInfo:(m,p,s) => `${m} months · ${p} projects · ${s==='parallel'?'⇉ Parallel':'⚡ Speed'}`,
+    schedInfo:(m,p,s,n) => `${m} months · ${p} projects · ${s==='parallel'?`⇉ ${n===0?'∞':n} parallel`:'⚡ Speed'}`,
+    parallelNLabel: n => n === 0 ? '∞' : String(n),
+    parallelNTip: n => n === 0 ? 'All projects simultaneously (not recommended for > 4 projects)' : `At most ${n} projects active simultaneously`,
     capUtilTitle:'Capacity Utilization',
     capUtilHint:'To edit individual months use the capacity table above.',
     capMonthlyHint:'Default applies to all months. Override individual months by changing a value (shown in orange). Entering the default value removes the override.',
@@ -99,12 +106,15 @@ const i18n = {
     toastExampleLoaded:'Example data loaded', toastCleared:'Data cleared',
     toastScheduled:'Scheduling complete', confirmClear:'Delete all data?',
     toastMinTeam:'At least one team required',
+    toastEmptyNames:'Please fill in all project and milestone names.',
+    toastStorageFull:'Storage full — data could not be saved.',
     btnShare:'⎘ Share link',
     toastShareCopied:'Link copied to clipboard!',
     toastShareFailed:'Could not copy link.',
     disclaimer:'🔒 All data is stored exclusively in your browser\'s local storage. No data is ever sent to a server.',
     csvProject:'Project', csvMilestone:'Milestone', csvPlannedMonth:'Planned Month',
-    csvStart:'Start', csvEnd:'End',
+    csvStart:'Start', csvEnd:'End', csvWait:'Wait', csvDep:'DependsOn',
+    thDep:'Depends on',
     exTeams:[{name:'Development',cap:20},{name:'Design',cap:20},{name:'QA/Testing',cap:20}],
     footerImpressum:'Legal Notice', footerDatenschutz:'Privacy Policy',
   }
@@ -144,6 +154,7 @@ let state = {
   startMonth: 0,
   startYear: 2026,
   strategy: 'parallel',
+  parallelism: 2,   // max simultaneous projects in parallel mode; 0 = unlimited (legacy behaviour)
   msStart: null,
   msEnd: null,
   usedCapacity: null,
@@ -191,7 +202,11 @@ function saveState() {
       dot.classList.remove('saving');
       st.textContent = L('saved')+' '+new Date().toLocaleTimeString(state.lang==='de'?'de-DE':'en-US');
     }, 300);
-  } catch(e) {}
+  } catch(e) {
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      toast(L('toastStorageFull'));
+    }
+  }
 }
 
 function loadState() {
@@ -234,6 +249,7 @@ function removeTeam(id) {
 function updateTeam(id, prop, val) {
   const team = state.teams.find(t => t.id === id);
   if (!team) return;
+  if (prop === 'capacity') val = Math.max(1, parseInt(val) || 1);
   team[prop] = val;
   renderTableHeaders();
   // When default capacity changes, refresh the monthly table so non-overridden cells show the new value
@@ -284,6 +300,11 @@ function renderToolbar() {
       <button class="btn" onclick="addRow()">${L('btnAddRow')}</button>
       <div class="strategy-toggle">
         <button class="btn ${state.strategy==='parallel'?'active':''}" onclick="setStrategy('parallel')" title="${L('stratParallelTip')}">${L('stratParallel')}</button>
+        ${state.strategy==='parallel' ? `<div class="parallel-n" title="${esc(L('parallelNTip')(state.parallelism))}">
+          <button class="pn-btn" onclick="adjustParallelism(-1)" ${state.parallelism===1?'disabled':''}>−</button>
+          <span class="pn-val">${esc(L('parallelNLabel')(state.parallelism))}</span>
+          <button class="pn-btn" onclick="adjustParallelism(1)">+</button>
+        </div>` : ''}
         <button class="btn ${state.strategy==='speed'?'active':''}" onclick="setStrategy('speed')" title="${L('stratSpeedTip')}">${L('stratSpeed')}</button>
       </div>
       <button class="btn primary" onclick="runScheduler()">${L('btnSchedule')}</button>
@@ -292,7 +313,19 @@ function renderToolbar() {
     </div>`;
 }
 
-function setStrategy(s) { state.strategy = s; renderToolbar(); if (state.msStart) runScheduler(); }
+function setStrategy(s) { state.strategy = s; renderToolbar(); if (state.msStart) runScheduler(); scheduleSave(); }
+
+function adjustParallelism(delta) {
+  const numProjects = new Set(state.rows.map(r => r.project).filter(Boolean)).size || 8;
+  const MAX_N = numProjects; // one step beyond max projects = unlimited (0)
+  let next = state.parallelism + delta;
+  if (next < 1) return;
+  if (next > MAX_N) next = 0; // 0 = ∞
+  state.parallelism = next;
+  renderToolbar();
+  if (state.msStart) runScheduler();
+  scheduleSave();
+}
 function setLang(lang) { state.lang = lang; document.documentElement.lang = lang; document.title = L('title'); renderAll(); saveState(); }
 
 function renderAll() {
@@ -415,6 +448,7 @@ function renderTableHeaders() {
   let html = `<th title="${L('prioTip')}" style="cursor:help;width:70px">${L('thPrio')}</th><th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
   state.teams.forEach(team => { html += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`; });
   html += `<th title="${L('waitTip')}" style="cursor:help">🔒</th>`;
+  html += `<th style="min-width:140px" title="${L('thDep')}">${L('thDep')}</th>`;
   html += '<th style="width:40px"></th>';
   tr.innerHTML = html;
 }
@@ -470,7 +504,7 @@ function renderTable() {
     html += `<td><input type="text" value="${esc(row.project)}" oninput="state.rows[${i}].project=this.value;scheduleSave()" placeholder="${L('phProject')}"></td>
       <td><input type="text" value="${esc(row.milestone)}" oninput="state.rows[${i}].milestone=this.value;scheduleSave()" placeholder="${L('phMilestone')}"></td>`;
     state.teams.forEach(team => {
-      html += `<td><input type="number" min="0" value="${row.efforts[team.id]||0}" oninput="state.rows[${i}].efforts['${team.id}']=parseFloat(this.value)||0;scheduleSave()"></td>`;
+      html += `<td><input type="number" min="0" value="${row.efforts[team.id]||0}" oninput="state.rows[${i}].efforts['${team.id}']=Math.max(0,parseFloat(this.value)||0);scheduleSave()"></td>`;
     });
 
     if (isFirst) {
@@ -479,6 +513,18 @@ function renderTable() {
       const locked = !row.canOverlap;
       html += `<td><button class="ms-lock ${locked?'locked':'unlocked'}" onclick="toggleRowOverlap(${i})" title="${locked ? L('waitTip') : L('overlapTip')}">${locked?'🔒':'🔓'}</button></td>`;
     }
+    // Cross-project dependency dropdown
+    let depHtml = `<select class="dep-select" onchange="setRowDep(${i},this.value)"><option value="">—</option>`;
+    state.rows.forEach((r2, j) => {
+      if (j === i) return; // skip self
+      if (r2.project === row.project) return; // skip same project (handled by canOverlap)
+      if (!r2.project || !r2.milestone) return;
+      const val = `${r2.project}/${r2.milestone}`;
+      const sel = row.waitFor === val ? ' selected' : '';
+      depHtml += `<option value="${esc(val)}"${sel}>${esc(r2.project)} · ${esc(r2.milestone)}</option>`;
+    });
+    depHtml += '</select>';
+    html += `<td>${depHtml}</td>`;
     html += `<td><button class="row-del" onclick="deleteRow(${i})">×</button></td>`;
     tr.innerHTML = html; body.appendChild(tr);
   });
@@ -520,8 +566,14 @@ function moveProject(projName, dir) {
 
 function addRow() {
   const efforts = {}; state.teams.forEach(t => { efforts[t.id] = 0; });
-  state.rows.push({ project:'', milestone:'', efforts, canOverlap: true });
+  state.rows.push({ project:'', milestone:'', efforts, canOverlap: true, waitFor: null });
   renderTable();
+  scheduleSave();
+}
+
+function setRowDep(i, val) {
+  state.rows[i].waitFor = val || null;
+  if (state.msStart) runScheduler();
   scheduleSave();
 }
 
@@ -550,24 +602,62 @@ function parseCSV(text) {
   const lines = text.trim().split('\n'); if (lines.length < 2) return;
   const sep = lines[0].includes(';') ? ';' : ',';
   const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g,''));
+
+  // Detect team columns — stop at known non-team column names
   const teamCols = [];
   for (let c = 2; c < headers.length; c++) {
     const h = headers[c];
-    if (/geplanter|planned|start|ende|end/i.test(h)) break;
-    const name = h.replace(/\s*\(P[TD]\)\s*$/i, '').trim();
-    if (name) teamCols.push({ colIdx: c, name });
+    if (/geplanter|planned|start|ende|end|wartet|wait|abhängig|dependson/i.test(h)) break;
+    // Extract capacity from header like "TeamName [20] (PT)" or "TeamName (PT)"
+    const capMatch = h.match(/\[(\d+)\]/);
+    const cap = capMatch ? parseInt(capMatch[1]) : 20;
+    const name = h.replace(/\s*\[\d+\]\s*/, '').replace(/\s*\(P[TD]\)\s*$/i, '').trim();
+    if (name) teamCols.push({ colIdx: c, name, cap });
   }
+
+  // Detect Wait and DepOn column indices
+  let waitColIdx = -1, depColIdx = -1;
+  headers.forEach((h, i) => {
+    if (/^wartet$|^wait$/i.test(h)) waitColIdx = i;
+    if (/^abhängigvon$|^dependson$/i.test(h)) depColIdx = i;
+  });
+
   if (teamCols.length > 0) {
-    state.teams = teamCols.map((tc, i) => ({ id:'t'+(i+1), name:tc.name, capacity:20, color:PALETTE[i%PALETTE.length], capOverrides:{} }));
+    state.teams = teamCols.map((tc, i) => ({
+      id: 't'+(i+1), name: tc.name, capacity: tc.cap,
+      color: PALETTE[i%PALETTE.length], capOverrides: {}
+    }));
     _nextId = teamCols.length + 1;
   }
+
   state.rows = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g,''));
     if (cols.length < 3) continue;
+
+    // Special override rows: __cap_ovr__;teamName;monthIdx;value
+    if (cols[0] === '__cap_ovr__') {
+      const team = state.teams.find(t => t.name === cols[1]);
+      if (team) {
+        const monthIdx = parseInt(cols[2]);
+        const val = parseFloat(cols[3]);
+        if (!isNaN(monthIdx) && !isNaN(val) && val >= 0) {
+          if (!team.capOverrides) team.capOverrides = {};
+          team.capOverrides[String(monthIdx)] = val;
+        }
+      }
+      continue;
+    }
+
     const efforts = {};
     state.teams.forEach((team, ti) => { efforts[team.id] = parseFloat(cols[teamCols[ti]?.colIdx]) || 0; });
-    state.rows.push({ project: cols[0]||'', milestone: cols[1]||'', efforts, canOverlap: true });
+    const waitVal = waitColIdx >= 0 ? cols[waitColIdx] : '';
+    const depVal  = depColIdx  >= 0 ? cols[depColIdx]  : '';
+    state.rows.push({
+      project: cols[0]||'', milestone: cols[1]||'', efforts,
+      canOverlap: waitVal !== '1' && waitVal.toLowerCase() !== 'lock',
+      waitFor: depVal || null
+    });
   }
   state.msStart = null;
 }
@@ -575,13 +665,33 @@ function parseCSV(text) {
 function exportCSV() {
   if (state.rows.length === 0) { toast(L('toastNoExport')); return; }
   const mo = L('months');
+  // Header: capacity included in team column name for round-trip fidelity
   let csv = `${L('csvProject')};${L('csvMilestone')}`;
-  state.teams.forEach(t => { csv += `;${t.name} (PT)`; });
+  state.teams.forEach(t => { csv += `;${t.name} [${t.capacity}] (PT)`; });
+  csv += `;${L('csvWait')};${L('csvDep')}`;
   if (state.msStart) csv += `;${L('csvStart')};${L('csvEnd')}`;
   csv += '\n';
+
+  // Capacity override rows — one row per override
+  state.teams.forEach(t => {
+    if (!t.capOverrides) return;
+    Object.entries(t.capOverrides).forEach(([monthIdx, val]) => {
+      csv += `__cap_ovr__;${t.name};${monthIdx};${val};;;`;
+      if (state.msStart) csv += ';;';
+      csv += '\n';
+    });
+  });
+
+  // Data rows
+  const firstOfProject = new Set();
   state.rows.forEach((r, i) => {
+    if (!firstOfProject.has(r.project)) firstOfProject.add(r.project);
     let line = `${r.project};${r.milestone}`;
     state.teams.forEach(t => { line += `;${r.efforts[t.id]||0}`; });
+    // Wait: first milestone of a project is always 0 (no predecessor)
+    const isFirst = state.rows.findIndex(x => x.project === r.project) === i;
+    line += `;${(!isFirst && !r.canOverlap) ? 1 : 0}`;
+    line += `;${r.waitFor || ''}`;
     if (state.msStart) {
       const fmt = m => { const mi=(state.startMonth+m)%12; const yr=state.startYear+Math.floor((state.startMonth+m)/12); return `${mo[mi]} ${yr}`; };
       line += `;${fmt(state.msStart[i])};${fmt(state.msEnd[i])}`;
@@ -600,6 +710,7 @@ function exportCSV() {
 // ═══════════════════════════════════════════════════════
 function runScheduler() {
   if (state.rows.length === 0) { toast(L('toastNoData')); return; }
+  if (state.rows.some(r => !r.project.trim() || !r.milestone.trim())) { toast(L('toastEmptyNames')); return; }
   // State is kept in sync by oninput handlers — no DOM re-read needed
 
   const projects = {}, order = [];
@@ -647,28 +758,52 @@ function runScheduler() {
 
   function getEligible(teamId, doneBeforeMonth) {
     const eligible = [];
-    order.forEach(proj => {
+    // In parallel mode, limit to top-N projects by priority order.
+    // parallelism === 0 means unlimited (legacy "all projects" behaviour).
+    const maxProjects = (state.strategy === 'parallel' && state.parallelism > 0)
+      ? state.parallelism
+      : Infinity;
+    let projsContributing = 0;
+
+    for (const proj of order) {
+      if (projsContributing >= maxProjects) break;
+
       const milestones = projects[proj];
+      let contributed = false;
+
       for (let mi = 0; mi < milestones.length; mi++) {
         const idx = milestones[mi].idx;
         const row = state.rows[idx];
         const teamDone = rem[idx][teamId] <= 0;
 
+        // Cross-project dependency: milestone blocked until another milestone is fully done
+        if (row.waitFor) {
+          const sep = row.waitFor.lastIndexOf('/');
+          const depProj = row.waitFor.slice(0, sep);
+          const depMs   = row.waitFor.slice(sep + 1);
+          const depIdx  = state.rows.findIndex(r => r.project === depProj && r.milestone === depMs);
+          if (depIdx >= 0 && !doneBeforeMonth.has(depIdx)) {
+            break; // nothing eligible in this project past the blocked milestone
+          }
+        }
+
         if (mi > 0) {
           const prevIdx = milestones[mi - 1].idx;
           if (row.canOverlap === false) {
             if (!doneBeforeMonth.has(prevIdx)) {
-              if (rem[prevIdx][teamId] > 0) eligible.push(prevIdx);
+              if (rem[prevIdx][teamId] > 0) { eligible.push(prevIdx); contributed = true; }
               break;
             }
           } else {
-            if (rem[prevIdx][teamId] > 0) { eligible.push(prevIdx); break; }
+            if (rem[prevIdx][teamId] > 0) { eligible.push(prevIdx); contributed = true; break; }
           }
         }
 
-        if (!teamDone) { eligible.push(idx); break; }
+        if (!teamDone) { eligible.push(idx); contributed = true; break; }
       }
-    });
+
+      if (contributed) projsContributing++;
+    }
     return eligible;
   }
 
@@ -693,24 +828,45 @@ function runScheduler() {
           if (spent === 0) break;
         }
       } else {
-        const eligible = getEligible(team.id, doneBeforeMonth);
-        if (eligible.length === 0) return;
-        const totalNeed = eligible.reduce((s, idx) => s + rem[idx][team.id], 0);
-        if (totalNeed <= 0) return;
-        const availCap = Math.min(cap, totalNeed);
+        // Parallel: re-evaluate eligible after each full round so newly unblocked milestones
+        // (🔓 predecessor just finished this month) can absorb remaining budget.
+        let budget = cap;
+        let outerSafety = 0;
+        while (budget > 0.001 && outerSafety++ < 10) {
+          const eligible = getEligible(team.id, doneBeforeMonth);
+          if (eligible.length === 0) break;
+          const totalAvailNeed = eligible.reduce((s, idx) => s + rem[idx][team.id], 0);
+          if (totalAvailNeed <= 0) break;
+          const roundBudget = Math.min(budget, totalAvailNeed);
 
-        let allocated = 0;
-        eligible.forEach((idx, ei) => {
-          const need = rem[idx][team.id];
-          let share;
-          if (ei === eligible.length - 1) {
-            share = availCap - allocated;
-          } else {
-            share = Math.round(availCap * need / totalNeed * 100) / 100;
+          // Multi-pass within this eligible set — redistributes surplus from capped items
+          let pending = [...eligible];
+          let remaining = roundBudget;
+          let innerSafety = 0;
+          while (remaining > 0.001 && pending.length > 0 && innerSafety++ < 10) {
+            const totalNeed = pending.reduce((s, idx) => s + rem[idx][team.id], 0);
+            if (totalNeed <= 0) break;
+            const nextPending = [];
+            let roundSpent = 0;
+            for (let j = 0; j < pending.length; j++) {
+              const idx = pending[j];
+              const need = rem[idx][team.id];
+              const share = j === pending.length - 1
+                ? remaining - roundSpent
+                : Math.round(remaining * need / totalNeed * 100) / 100;
+              const spent = allocate(month, idx, team.id, Math.min(share, need));
+              roundSpent += spent;
+              if (rem[idx][team.id] > 0.001) nextPending.push(idx);
+            }
+            remaining -= roundSpent;
+            if (nextPending.length === pending.length) break;
+            pending = nextPending;
           }
-          const spent = allocate(month, idx, team.id, Math.min(share, need));
-          allocated += spent;
-        });
+
+          const usedThisRound = roundBudget - remaining;
+          budget -= usedThisRound;
+          if (usedThisRound < 0.001) break; // no progress — avoid infinite loop
+        }
       }
     });
 
@@ -786,7 +942,7 @@ function renderGantt() {
   document.getElementById('ganttChart').innerHTML = html;
   renderCapOverview(num);
   renderWarnings(num);
-  document.getElementById('schedInfo').textContent = L('schedInfo')(num, Object.keys(pc).length, state.strategy);
+  document.getElementById('schedInfo').textContent = L('schedInfo')(num, Object.keys(pc).length, state.strategy, state.parallelism ?? 2);
 }
 
 function renderCapOverview(num) {
@@ -892,9 +1048,9 @@ function clearAll() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  URL Share
+//  URL Share  (gzip + base64 for compact links)
 // ═══════════════════════════════════════════════════════
-function encodeStateToHash() {
+async function encodeStateToHash() {
   const payload = {
     teams: state.teams,
     rows: state.rows,
@@ -905,23 +1061,44 @@ function encodeStateToHash() {
     _nextId: _nextId,
   };
   try {
-    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    const json = JSON.stringify(payload);
+    if (typeof CompressionStream !== 'undefined') {
+      const bytes = new TextEncoder().encode(json);
+      const cs = new CompressionStream('gzip');
+      const writer = cs.writable.getWriter();
+      writer.write(bytes); writer.close();
+      const buf = await new Response(cs.readable).arrayBuffer();
+      const binary = String.fromCharCode(...new Uint8Array(buf));
+      return 'gz:' + btoa(binary);
+    }
+    // Fallback: plain base64 (no CompressionStream support)
+    const bytes = new TextEncoder().encode(json);
     let binary = '';
     bytes.forEach(b => binary += String.fromCharCode(b));
     return btoa(binary);
   } catch(e) { return null; }
 }
 
-function decodeHashToState(hash) {
+async function decodeHashToState(hash) {
   try {
+    if (hash.startsWith('gz:')) {
+      const binary = atob(hash.slice(3));
+      const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+      const ds = new DecompressionStream('gzip');
+      const writer = ds.writable.getWriter();
+      writer.write(bytes); writer.close();
+      const buf = await new Response(ds.readable).arrayBuffer();
+      return JSON.parse(new TextDecoder().decode(buf));
+    }
+    // Legacy: plain base64
     const binary = atob(hash);
     const bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
     return JSON.parse(new TextDecoder().decode(bytes));
   } catch(e) { return null; }
 }
 
-function copyShareLink() {
-  const encoded = encodeStateToHash();
+async function copyShareLink() {
+  const encoded = await encodeStateToHash();
   if (!encoded) { toast(L('toastShareFailed')); return; }
   const url = `${location.origin}${location.pathname}#share=${encoded}`;
   navigator.clipboard.writeText(url).then(() => {
@@ -931,10 +1108,10 @@ function copyShareLink() {
   });
 }
 
-function loadFromHash() {
+async function loadFromHash() {
   const hash = location.hash;
   if (!hash.startsWith('#share=')) return false;
-  const decoded = decodeHashToState(hash.slice(7));
+  const decoded = await decodeHashToState(hash.slice(7));
   if (!decoded || !decoded.rows || !decoded.teams) return false;
   state = { ...state, ...decoded };
   _nextId = state._nextId || 4;
@@ -956,9 +1133,9 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') document.query
 
 function toast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
 
-(function init() {
+(async function init() {
   // URL hash takes priority over localStorage (shared links)
-  const fromHash = loadFromHash();
+  const fromHash = await loadFromHash();
   if (!fromHash) loadState();
 
   renderAll();
@@ -968,7 +1145,8 @@ function toast(msg) { const el=document.getElementById('toast'); el.textContent=
     scheduleSave();
   });
   document.getElementById('startYear').addEventListener('change', function() {
-    state.startYear = parseInt(this.value) || 2026;
+    state.startYear = Math.max(2000, Math.min(2099, parseInt(this.value) || 2026));
+    this.value = state.startYear;
     if (state.msStart) runScheduler(); else renderCapMonthly();
     scheduleSave();
   });
