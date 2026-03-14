@@ -67,6 +67,32 @@
   .cap-add { display:flex; align-items:center; justify-content:center; min-width:100px; flex:0 0 auto; padding:10px 20px; background:var(--bg); border:2px dashed var(--border); border-radius:var(--radius); cursor:pointer; font-family:var(--mono); font-size:12px; color:var(--text2); transition:all .15s; }
   .cap-add:hover { border-color:var(--accent); color:var(--accent); }
 
+  .cap-monthly { overflow-x:auto; }
+  .cap-monthly table { border-collapse:collapse; font-family:var(--mono); font-size:11px; }
+  .cap-monthly th { padding:4px 6px; color:var(--text2); font-weight:600; text-align:center; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--bg2); }
+  .cap-monthly th:first-child { text-align:left; position:sticky; left:0; background:var(--bg2); z-index:1; min-width:120px; }
+  .cap-monthly td { padding:2px; text-align:center; border-bottom:1px solid var(--border); }
+  .cap-monthly td:first-child { text-align:left; position:sticky; left:0; background:var(--bg2); z-index:1; padding:4px 8px; font-weight:600; }
+  .cap-monthly input { width:44px; font-family:var(--mono); font-size:11px; text-align:center; padding:3px 2px; border:1px solid transparent; border-radius:3px; background:transparent; color:var(--text); }
+  .cap-monthly input:hover { border-color:var(--border); }
+  .cap-monthly input:focus { outline:none; border-color:var(--accent); background:var(--bg); }
+  .cap-monthly input.override { color:var(--orange); font-weight:700; }
+
+  .cap-monthly { overflow-x:auto; }
+  .cap-monthly table { border-collapse:collapse; font-family:var(--mono); font-size:11px; }
+  .cap-monthly th { padding:4px 0; text-align:center; color:var(--text2); font-weight:600; min-width:56px; border-bottom:1px solid var(--border); }
+  .cap-monthly th.team-label { text-align:left; padding-right:12px; min-width:120px; white-space:nowrap; border-bottom:1px solid var(--border); }
+  .cap-monthly td { padding:2px; text-align:center; }
+  .cap-monthly input {
+    width:48px; font-family:var(--mono); font-size:11px; text-align:center;
+    padding:3px 2px; border:1px solid transparent; border-radius:3px;
+    background:transparent; color:var(--text);
+  }
+  .cap-monthly input:hover { border-color:var(--border); }
+  .cap-monthly input:focus { outline:none; border-color:var(--accent); background:var(--bg); }
+  .cap-monthly input.overridden { color:var(--orange); font-weight:700; }
+  .cap-monthly-hint { font-family:var(--mono); font-size:10px; color:var(--text2); margin-top:6px; }
+
   .settings-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
   .settings-row label { font-size:12px; color:var(--text2); display:flex; align-items:center; gap:6px; }
   .settings-row select, .settings-row input[type="number"] { font-family:var(--mono); font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); }
@@ -90,6 +116,12 @@
   .ms-lock:hover { background:var(--bg3); }
   .ms-lock.first { color:var(--border); cursor:default; }
 
+  .prio-cell { display:flex; align-items:center; gap:2px; }
+  .prio-num { font-family:var(--mono); font-size:11px; font-weight:700; color:var(--text2); width:18px; text-align:center; }
+  .prio-btn { width:22px; height:18px; border:none; background:none; color:var(--text2); cursor:pointer; border-radius:3px; font-size:12px; display:flex; align-items:center; justify-content:center; padding:0; line-height:1; }
+  .prio-btn:hover { background:var(--accent); color:#fff; }
+  .prio-btn:disabled { opacity:0.15; cursor:default; background:none; color:var(--text2); }
+
   .gantt-container { overflow-x:auto; padding-bottom:12px; }
   .gantt { min-width:800px; }
   .gantt-header { display:flex; border-bottom:2px solid var(--border); margin-left:220px; }
@@ -105,7 +137,9 @@
   .cap-row { display:flex; align-items:center; margin-bottom:6px; }
   .cap-row-label { flex:0 0 220px; font-family:var(--mono); font-size:11px; font-weight:600; padding:0 12px; display:flex; align-items:center; gap:6px; }
   .cap-cells { display:flex; flex:1; }
-  .cap-cell { flex:0 0 80px; border-left:1px solid var(--border); padding:2px 4px; height:24px; }
+  .cap-cell { flex:0 0 80px; border-left:1px solid var(--border); padding:2px 4px; height:24px; cursor:pointer; position:relative; }
+  .cap-cell:hover { background:rgba(78,154,245,.1); }
+  .cap-cell.has-override::after { content:''; position:absolute; top:2px; right:2px; width:5px; height:5px; border-radius:50%; background:var(--orange); }
   .cap-fill { height:100%; border-radius:2px; transition:width .3s; position:relative; }
   .cap-pct { font-family:var(--mono); font-size:9px; font-weight:600; color:#fff; position:absolute; right:4px; top:50%; transform:translateY(-50%); text-shadow:0 1px 2px rgba(0,0,0,.5); }
 
@@ -160,7 +194,10 @@
           <label><span id="lblYear"></span><input type="number" id="startYear" value="2026" style="width:70px"></label>
         </div>
       </div>
-      <div class="panel-body"><div class="capacity-grid" id="capacityGrid"></div></div>
+      <div class="panel-body">
+        <div class="capacity-grid" id="capacityGrid"></div>
+        <div id="capMonthlyGrid" style="margin-top:16px;"></div>
+      </div>
     </div>
     <div class="panel">
       <div class="panel-header">
@@ -234,12 +271,16 @@ const i18n = {
     panelData:'Projektdaten', panelGantt:'Zeitplan (Gantt)', panelAnalysis:'Analyse',
     lblStart:'Start:', lblYear:'Jahr:',
     thProject:'Projekt', thMilestone:'Meilenstein',
+    thPrio:'Prio',
+    prioTip:'Projektpriorität — oben = höchste Prio (im Speed-Modus relevant)',
     phProject:'Projekt', phMilestone:'Meilenstein',
     addTeam:'+ Team',
     entries: n => `${n} Einträge`,
     emptyState:'Noch keine Daten. Lade ein CSV oder klicke <code>Beispiel laden</code>.',
     schedInfo:(m,p,s) => `${m} Monate · ${p} Projekte · ${s==='parallel'?'⇉ Parallel':'⚡ Speed'}`,
     capUtilTitle:'Kapazitätsauslastung',
+    capMonthlyHint:'Klicke auf eine Zelle um die Kapa für einen Monat zu überschreiben. Orange = überschrieben.',
+    lblMonths:'Monate:', 
     warnOver:(name,lbl,used,cap,pct) => `⚠ ${name} in ${lbl}: ${used} PT geplant, nur ${cap} PT verfügbar (${pct}%)`,
     warnOk:'✓ Alle Teams innerhalb der Kapazitätsgrenzen',
     warnFinish:(proj,m) => `✓ ${proj} fertig in ${m}`,
@@ -275,12 +316,16 @@ const i18n = {
     panelData:'Project Data', panelGantt:'Schedule (Gantt)', panelAnalysis:'Analysis',
     lblStart:'Start:', lblYear:'Year:',
     thProject:'Project', thMilestone:'Milestone',
+    thPrio:'Prio',
+    prioTip:'Project priority — top = highest priority (relevant in Speed mode)',
     phProject:'Project', phMilestone:'Milestone',
     addTeam:'+ Team',
     entries: n => `${n} entries`,
     emptyState:'No data yet. Load a CSV or click <code>Load example</code>.',
     schedInfo:(m,p,s) => `${m} months · ${p} projects · ${s==='parallel'?'⇉ Parallel':'⚡ Speed'}`,
     capUtilTitle:'Capacity Utilization',
+    capMonthlyHint:'Click a cell to override capacity for a specific month. Orange = overridden.',
+    lblMonths:'Months:',
     warnOver:(name,lbl,used,cap,pct) => `⚠ ${name} in ${lbl}: ${used} PD planned, only ${cap} PD available (${pct}%)`,
     warnOk:'✓ All teams within capacity limits',
     warnFinish:(proj,m) => `✓ ${proj} finished in ${m}`,
@@ -324,9 +369,9 @@ function newId() {
 
 let state = {
   teams: [
-    { id:'t1', name:'Team A', capacity:20, color:PALETTE[0] },
-    { id:'t2', name:'Team B', capacity:20, color:PALETTE[1] },
-    { id:'t3', name:'Team C', capacity:20, color:PALETTE[2] },
+    { id:'t1', name:'Team A', capacity:20, color:PALETTE[0], capOverrides:{} },
+    { id:'t2', name:'Team B', capacity:20, color:PALETTE[1], capOverrides:{} },
+    { id:'t3', name:'Team C', capacity:20, color:PALETTE[2], capOverrides:{} },
   ],
   rows: [],
   startMonth: 0,
@@ -341,6 +386,12 @@ let state = {
 
 function L(k) { return i18n[state.lang][k]; }
 function esc(s) { return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function getTeamCap(team, month) {
+  if (!team.capOverrides) team.capOverrides = {};
+  const key = String(month);
+  return team.capOverrides.hasOwnProperty(key) ? team.capOverrides[key] : team.capacity;
+}
 
 // ═══════════════════════════════════════════════════════
 //  LocalStorage
@@ -379,7 +430,7 @@ setInterval(saveState, 5000);
 // ═══════════════════════════════════════════════════════
 function addTeam() {
   const id = newId();
-  state.teams.push({ id, name:'Team '+state.teams.length, capacity:20, color:PALETTE[state.teams.length%PALETTE.length] });
+  state.teams.push({ id, name:'Team '+state.teams.length, capacity:20, color:PALETTE[state.teams.length%PALETTE.length], capOverrides:{} });
   state.rows.forEach(r => { r.efforts[id] = 0; });
   state.msStart = null;
   renderCapacity(); renderTableHeaders(); renderTable(); hideSchedule();
@@ -500,11 +551,59 @@ function renderCapacity() {
   const addBtn = document.createElement('div');
   addBtn.className = 'cap-add'; addBtn.onclick = addTeam; addBtn.textContent = L('addTeam');
   g.appendChild(addBtn);
+  renderCapMonthly();
+}
+
+function renderCapMonthly() {
+  const el = document.getElementById('capMonthlyGrid');
+  const mo = L('months');
+  const numMonths = (state.msEnd ? Math.max(...state.msEnd) + 2 : 12);
+  const num = Math.max(numMonths, 12);
+
+  let html = `<div class="cap-monthly"><table><thead><tr><th></th>`;
+  for (let m = 0; m < num; m++) {
+    const mi = (state.startMonth + m) % 12;
+    const yr = state.startYear + Math.floor((state.startMonth + m) / 12);
+    html += `<th>${mo[mi]}<br>${String(yr).slice(2)}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  state.teams.forEach(team => {
+    if (!team.capOverrides) team.capOverrides = {};
+    html += `<tr><td style="color:${team.color}">${esc(team.name)}</td>`;
+    for (let m = 0; m < num; m++) {
+      const key = String(m);
+      const hasOvr = team.capOverrides.hasOwnProperty(key);
+      const val = hasOvr ? team.capOverrides[key] : '';
+      html += `<td><input type="number" min="0" class="${hasOvr?'override':''}" value="${val}" placeholder="${team.capacity}" oninput="setCapOverride('${team.id}',${m},this)"></td>`;
+    }
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function setCapOverride(teamId, month, input) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) return;
+  if (!team.capOverrides) team.capOverrides = {};
+  const key = String(month);
+  const raw = input.value.trim();
+  if (raw === '') {
+    delete team.capOverrides[key];
+    input.classList.remove('override');
+  } else {
+    const val = parseFloat(raw);
+    if (isNaN(val) || val < 0) return;
+    team.capOverrides[key] = val;
+    input.classList.add('override');
+  }
 }
 
 function renderTableHeaders() {
   const tr = document.getElementById('tableHead');
-  let html = `<th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
+  let html = `<th title="${L('prioTip')}" style="cursor:help;width:70px">${L('thPrio')}</th><th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
   state.teams.forEach(team => { html += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`; });
   html += `<th title="${L('waitTip')}" style="cursor:help">🔒</th>`;
   html += '<th style="width:40px"></th>';
@@ -522,22 +621,51 @@ function renderTable() {
   empty.style.display = 'none';
   document.getElementById('rowCount').textContent = L('entries')(state.rows.length);
 
-  // Detect first milestone per project
+  // Build project order and detect first/count per project
+  const projectOrder = [];
+  const projectFirst = {}; // project name -> first row index
+  const projectCount = {}; // project name -> # milestones
+  state.rows.forEach((row, i) => {
+    if (row.canOverlap === undefined) row.canOverlap = true;
+    if (!projectCount[row.project]) {
+      projectOrder.push(row.project);
+      projectFirst[row.project] = i;
+      projectCount[row.project] = 0;
+    }
+    projectCount[row.project]++;
+  });
+
   const seenProjects = new Set();
 
   state.rows.forEach((row, i) => {
-    // Ensure canOverlap exists (migration from old data)
-    if (row.canOverlap === undefined) row.canOverlap = true;
-
     const isFirst = !seenProjects.has(row.project);
     if (row.project) seenProjects.add(row.project);
 
+    const prioIdx = projectOrder.indexOf(row.project);
+    const isFirstProject = prioIdx === 0;
+    const isLastProject = prioIdx === projectOrder.length - 1;
+
     const tr = document.createElement('tr');
-    let html = `<td><input type="text" value="${esc(row.project)}" oninput="state.rows[${i}].project=this.value" placeholder="${L('phProject')}"></td>
+    let html = '';
+
+    // Prio column
+    if (isFirst) {
+      const msCount = projectCount[row.project];
+      html += `<td rowspan="${msCount}"><div class="prio-cell">
+        <div style="display:flex;flex-direction:column;gap:1px;">
+          <button class="prio-btn" onclick="moveProject('${esc(row.project)}',-1)" ${isFirstProject?'disabled':''}  title="▲">▲</button>
+          <button class="prio-btn" onclick="moveProject('${esc(row.project)}',1)" ${isLastProject?'disabled':''} title="▼">▼</button>
+        </div>
+        <span class="prio-num">${prioIdx + 1}</span>
+      </div></td>`;
+    }
+
+    html += `<td><input type="text" value="${esc(row.project)}" oninput="state.rows[${i}].project=this.value" placeholder="${L('phProject')}"></td>
       <td><input type="text" value="${esc(row.milestone)}" oninput="state.rows[${i}].milestone=this.value" placeholder="${L('phMilestone')}"></td>`;
     state.teams.forEach(team => {
       html += `<td><input type="number" min="0" value="${row.efforts[team.id]||0}" oninput="state.rows[${i}].efforts['${team.id}']=parseFloat(this.value)||0"></td>`;
     });
+
     // Lock column
     if (isFirst) {
       html += `<td><button class="ms-lock first" title="—" disabled>—</button></td>`;
@@ -554,6 +682,36 @@ function toggleRowOverlap(i) {
   state.rows[i].canOverlap = !state.rows[i].canOverlap;
   renderTable();
   if (state.msStart) runScheduler();
+}
+
+function moveProject(projName, dir) {
+  // Collect project blocks in order
+  const blocks = [];
+  let currentProj = null, currentBlock = [];
+  state.rows.forEach((r, i) => {
+    if (r.project !== currentProj) {
+      if (currentBlock.length) blocks.push({ name: currentProj, rows: currentBlock });
+      currentProj = r.project;
+      currentBlock = [r];
+    } else {
+      currentBlock.push(r);
+    }
+  });
+  if (currentBlock.length) blocks.push({ name: currentProj, rows: currentBlock });
+
+  const idx = blocks.findIndex(b => b.name === projName);
+  if (idx < 0) return;
+  const targetIdx = idx + dir;
+  if (targetIdx < 0 || targetIdx >= blocks.length) return;
+
+  // Swap blocks
+  [blocks[idx], blocks[targetIdx]] = [blocks[targetIdx], blocks[idx]];
+
+  // Flatten back
+  state.rows = blocks.flatMap(b => b.rows);
+  state.msStart = null;
+  renderTable();
+  hideSchedule();
 }
 
 function addRow() {
@@ -581,7 +739,7 @@ function parseCSV(text) {
     if (name) teamCols.push({ colIdx: c, name });
   }
   if (teamCols.length > 0) {
-    state.teams = teamCols.map((tc, i) => ({ id:'t'+(i+1), name:tc.name, capacity:20, color:PALETTE[i%PALETTE.length] }));
+    state.teams = teamCols.map((tc, i) => ({ id:'t'+(i+1), name:tc.name, capacity:20, color:PALETTE[i%PALETTE.length], capOverrides:{} }));
     _nextId = teamCols.length + 1;
   }
   state.rows = [];
@@ -719,7 +877,7 @@ function runScheduler() {
     for (let i = 0; i < N; i++) { if (isMsDone(i)) doneBeforeMonth.add(i); }
 
     state.teams.forEach(team => {
-      let cap = team.capacity;
+      let cap = getTeamCap(team, month);
       if (cap <= 0) return;
 
       if (state.strategy === 'speed') {
@@ -832,18 +990,51 @@ function renderCapOverview(num) {
   const mo = L('months');
   let html = `<h3 style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">${L('capUtilTitle')}</h3>`;
   state.teams.forEach(team => {
+    if (!team.capOverrides) team.capOverrides = {};
     html += `<div class="cap-row"><div class="cap-row-label"><div class="cap-badge" style="background:${team.color};width:22px;height:22px;font-size:10px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-weight:700;">&nbsp;</div> ${esc(team.name)}</div><div class="cap-cells">`;
     for (let m = 0; m < num; m++) {
       const u = (state.usedCapacity && state.usedCapacity[m] && state.usedCapacity[m][team.id]) || 0;
-      const cap = team.capacity;
+      const cap = getTeamCap(team, m);
+      const hasOvr = team.capOverrides.hasOwnProperty(String(m));
       const pct = cap > 0 ? Math.round(u/cap*100) : 0;
       const w = Math.min(pct, 100);
       const over = pct > 100;
-      html += `<div class="cap-cell" title="${esc(team.name)}: ${Math.round(u*10)/10}/${cap} PT (${pct}%)"><div class="cap-fill${over?' over':''}" style="width:${w}%;background:${over?'var(--red)':team.color};">${pct>30?`<span class="cap-pct">${pct}%</span>`:''}</div></div>`;
+      html += `<div class="cap-cell${hasOvr?' has-override':''}" title="${esc(team.name)}: ${Math.round(u*10)/10}/${cap} PT (${pct}%)${hasOvr?' [überschrieben]':''}" onclick="editCapOverride('${team.id}',${m})"><div class="cap-fill${over?' over':''}" style="width:${w}%;background:${over?'var(--red)':team.color};">${pct>30?`<span class="cap-pct">${pct}%</span>`:''}</div></div>`;
     }
     html += '</div></div>';
   });
   document.getElementById('capOverview').innerHTML = html;
+}
+
+function editCapOverride(teamId, month) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) return;
+  if (!team.capOverrides) team.capOverrides = {};
+  const mo = L('months');
+  const mi = (state.startMonth + month) % 12;
+  const yr = state.startYear + Math.floor((state.startMonth + month) / 12);
+  const label = `${mo[mi]} ${yr}`;
+  const current = getTeamCap(team, month);
+  const hasOvr = team.capOverrides.hasOwnProperty(String(month));
+
+  const msg = hasOvr
+    ? `${team.name} — ${label}\n\n${state.lang==='de'?'Aktuelle Überschreibung':'Current override'}: ${current} PT\n${state.lang==='de'?'Default':'Default'}: ${team.capacity} PT\n\n${state.lang==='de'?'Neuen Wert eingeben (leer = zurück auf Default)':'Enter new value (empty = reset to default)'}:`
+    : `${team.name} — ${label}\n\n${state.lang==='de'?'Standard-Kapazität':'Default capacity'}: ${team.capacity} PT\n\n${state.lang==='de'?'Wert für diesen Monat überschreiben':'Override value for this month'}:`;
+
+  let input;
+  try { input = prompt(msg, hasOvr ? current : ''); } catch(e) { return; }
+  if (input === null) return; // cancelled
+
+  if (input.trim() === '') {
+    delete team.capOverrides[String(month)];
+  } else {
+    const val = parseFloat(input);
+    if (isNaN(val) || val < 0) return;
+    team.capOverrides[String(month)] = val;
+  }
+
+  if (state.msStart) runScheduler();
+  else { renderCapacity(); }
 }
 
 function renderWarnings(num) {
@@ -853,7 +1044,7 @@ function renderWarnings(num) {
   for (let m = 0; m < num; m++) {
     state.teams.forEach(team => {
       const u = (state.usedCapacity && state.usedCapacity[m] && state.usedCapacity[m][team.id]) || 0;
-      const cap = team.capacity;
+      const cap = getTeamCap(team, m);
       const mi = (state.startMonth+m)%12;
       const yr = state.startYear + Math.floor((state.startMonth+m)/12);
       if (u > cap + 0.01) w.push({type:'over', text: L('warnOver')(team.name, `${mo[mi]} ${yr}`, Math.round(u), cap, Math.round(u/cap*100))});
@@ -883,7 +1074,7 @@ function renderWarnings(num) {
 // ═══════════════════════════════════════════════════════
 function loadExample() {
   const ex = L('exTeams');
-  state.teams = ex.map((t,i) => ({ id:'t'+(i+1), name:t.name, capacity:t.cap, color:PALETTE[i%PALETTE.length] }));
+  state.teams = ex.map((t,i) => ({ id:'t'+(i+1), name:t.name, capacity:t.cap, color:PALETTE[i%PALETTE.length], capOverrides:{} }));
   _nextId = ex.length + 1;
   const e = (a,b,c) => ({t1:a,t2:b,t3:c});
   state.rows = [
