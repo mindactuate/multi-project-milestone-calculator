@@ -46,6 +46,7 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 - **CSV Import** — load your project data from a CSV file (`;` or `,` separated, auto-detected)
 - **CSV Export** — save the plan including scheduled months back to CSV
 - **Auto-save** — state is saved to `localStorage` every 5 seconds
+- **Share link** — encode the full plan as a URL hash and copy it to the clipboard; recipients open it instantly with no setup
 - **Example data** — one-click load of 8 sample projects with 19 milestones
 - Inline editing of all fields directly in the table
 
@@ -61,10 +62,10 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 - Language preference is persisted
 
 ### Privacy & Legal
-- **100% client-side** — all data stays in your browser's `localStorage`
+- **100% client-side** — all data stays in your browser's `localStorage`, prominently shown at the top of the UI
 - No server, no cookies, no tracking, no analytics
 - **No external resources** — no Google Fonts, no CDN calls, no tracking pixels
-- System fonts only (SF Mono, Segoe UI, etc.) — zero network requests beyond the HTML itself
+- System fonts only (SF Mono, Segoe UI, etc.) — zero network requests beyond the initial file load
 
 ---
 
@@ -131,10 +132,10 @@ Each team puts **all capacity into the highest-priority eligible milestone** fir
 
 ## Tech Stack
 
-- **Zero dependencies** — single HTML file, vanilla JavaScript, CSS
+- **Zero dependencies** — vanilla JavaScript, no npm, no bundler, no framework
+- **Three files** — `index.html`, `app.js`, `style.css`
 - **System fonts** — no external font loading (DSGVO-compliant, no Google Fonts CDN)
-- **No build step** — no npm, no bundler, no framework
-- **No external requests** — the HTML file is completely self-contained
+- **No external requests** — completely self-contained, zero network requests at runtime
 - Tested in Chrome, Firefox, Safari, Edge
 
 ---
@@ -142,10 +143,10 @@ Each team puts **all capacity into the highest-priority eligible milestone** fir
 ## Contributing
 
 1. Fork the repo
-2. Edit `index.html`
+2. Edit `index.html`, `app.js`, and/or `style.css`
 3. Open a Pull Request
 
-Since it's a single file, there's no build process — just edit and test in the browser.
+There's no build process — just edit and test in the browser.
 
 ---
 
