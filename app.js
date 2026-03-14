@@ -464,24 +464,31 @@ function renderTable() {
   empty.style.display = 'none';
   document.getElementById('rowCount').textContent = L('entries')(state.rows.length);
 
+  // Assign each row a group key: non-empty project names are grouped, empty ones are unique
+  const rowGroupKey = [];
+  let emptyCounter = 0;
   const projectOrder = [];
   const projectCount = {};
   state.rows.forEach((row) => {
     if (row.canOverlap === undefined) row.canOverlap = true;
-    if (!projectCount[row.project]) {
-      projectOrder.push(row.project);
-      projectCount[row.project] = 0;
+    const key = row.project || `__empty_${emptyCounter++}`;
+    rowGroupKey.push(key);
+    if (!projectCount[key]) {
+      projectOrder.push(key);
+      projectCount[key] = 1;
+    } else {
+      projectCount[key]++;
     }
-    projectCount[row.project]++;
   });
 
   const seenProjects = new Set();
 
   state.rows.forEach((row, i) => {
-    const isFirst = !seenProjects.has(row.project);
-    if (row.project) seenProjects.add(row.project);
+    const key = rowGroupKey[i];
+    const isFirst = !seenProjects.has(key);
+    seenProjects.add(key);
 
-    const prioIdx = projectOrder.indexOf(row.project);
+    const prioIdx = projectOrder.indexOf(key);
     const isFirstProject = prioIdx === 0;
     const isLastProject = prioIdx === projectOrder.length - 1;
 
@@ -489,7 +496,7 @@ function renderTable() {
     let html = '';
 
     if (isFirst) {
-      const msCount = projectCount[row.project];
+      const msCount = projectCount[key];
       // Use escJS() for the project name inside the single-quoted JS string
       const projJS = escJS(row.project);
       html += `<td rowspan="${msCount}"><div class="prio-cell">
