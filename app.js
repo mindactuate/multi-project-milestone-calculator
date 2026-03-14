@@ -50,6 +50,9 @@ const i18n = {
     toastExampleLoaded:'Beispieldaten geladen', toastCleared:'Daten gelöscht',
     toastScheduled:'Scheduling abgeschlossen', confirmClear:'Alle Daten löschen?',
     toastMinTeam:'Mindestens ein Team erforderlich',
+    btnShare:'⎘ Link teilen',
+    toastShareCopied:'Link in Zwischenablage kopiert!',
+    toastShareFailed:'Link konnte nicht kopiert werden.',
     disclaimer:'🔒 Alle Daten werden ausschließlich lokal in deinem Browser gespeichert (localStorage). Es werden keine Daten an einen Server gesendet.',
     csvProject:'Projekt', csvMilestone:'Meilenstein', csvPlannedMonth:'Geplanter Monat',
     csvStart:'Start', csvEnd:'Ende',
@@ -96,6 +99,9 @@ const i18n = {
     toastExampleLoaded:'Example data loaded', toastCleared:'Data cleared',
     toastScheduled:'Scheduling complete', confirmClear:'Delete all data?',
     toastMinTeam:'At least one team required',
+    btnShare:'⎘ Share link',
+    toastShareCopied:'Link copied to clipboard!',
+    toastShareFailed:'Could not copy link.',
     disclaimer:'🔒 All data is stored exclusively in your browser\'s local storage. No data is ever sent to a server.',
     csvProject:'Project', csvMilestone:'Milestone', csvPlannedMonth:'Planned Month',
     csvStart:'Start', csvEnd:'End',
@@ -281,6 +287,7 @@ function renderToolbar() {
         <button class="btn ${state.strategy==='speed'?'active':''}" onclick="setStrategy('speed')" title="${L('stratSpeedTip')}">${L('stratSpeed')}</button>
       </div>
       <button class="btn primary" onclick="runScheduler()">${L('btnSchedule')}</button>
+      <button class="btn" onclick="copyShareLink()">${L('btnShare')}</button>
       <button class="btn danger" onclick="clearAll()">${L('btnClear')}</button>
     </div>`;
 }
@@ -289,9 +296,14 @@ function setStrategy(s) { state.strategy = s; renderToolbar(); if (state.msStart
 function setLang(lang) { state.lang = lang; document.documentElement.lang = lang; document.title = L('title'); renderAll(); saveState(); }
 
 function renderAll() {
-  renderHeader(); renderToolbar(); renderStaticLabels(); renderFooter();
+  renderHeader(); renderDisclaimer(); renderToolbar(); renderStaticLabels(); renderFooter();
   renderMonthSelector(); renderCapacity(); renderTableHeaders(); renderTable();
   if (state.msStart) renderGantt();
+}
+
+function renderDisclaimer() {
+  document.getElementById('appDisclaimer').innerHTML =
+    `<div class="disclaimer-bar">${L('disclaimer')}</div>`;
 }
 
 function renderStaticLabels() {
@@ -306,7 +318,7 @@ function renderStaticLabels() {
 function renderFooter() {
   const f = document.getElementById('appFooter');
   f.className = 'app-footer';
-  f.innerHTML = `${L('disclaimer')}<div class="footer-links"><a onclick="openModal('impressum')">${L('footerImpressum')}</a><a onclick="openModal('datenschutz')">${L('footerDatenschutz')}</a></div>`;
+  f.innerHTML = `<div class="footer-links"><a onclick="openModal('impressum')">${L('footerImpressum')}</a><a onclick="openModal('datenschutz')">${L('footerDatenschutz')}</a></div>`;
 }
 
 function renderMonthSelector() {
@@ -880,6 +892,58 @@ function clearAll() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  URL Share
+// ═══════════════════════════════════════════════════════
+function encodeStateToHash() {
+  const payload = {
+    teams: state.teams,
+    rows: state.rows,
+    startMonth: state.startMonth,
+    startYear: state.startYear,
+    strategy: state.strategy,
+    lang: state.lang,
+    _nextId: _nextId,
+  };
+  try {
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    return btoa(binary);
+  } catch(e) { return null; }
+}
+
+function decodeHashToState(hash) {
+  try {
+    const binary = atob(hash);
+    const bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch(e) { return null; }
+}
+
+function copyShareLink() {
+  const encoded = encodeStateToHash();
+  if (!encoded) { toast(L('toastShareFailed')); return; }
+  const url = `${location.origin}${location.pathname}#share=${encoded}`;
+  navigator.clipboard.writeText(url).then(() => {
+    toast(L('toastShareCopied'));
+  }).catch(() => {
+    toast(L('toastShareFailed'));
+  });
+}
+
+function loadFromHash() {
+  const hash = location.hash;
+  if (!hash.startsWith('#share=')) return false;
+  const decoded = decodeHashToState(hash.slice(7));
+  if (!decoded || !decoded.rows || !decoded.teams) return false;
+  state = { ...state, ...decoded };
+  _nextId = state._nextId || 4;
+  // Remove hash from URL so refreshing doesn't re-apply it over saved changes
+  history.replaceState(null, '', location.pathname);
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════
 //  Modals, Toast, Init
 // ═══════════════════════════════════════════════════════
 function openModal(type) {
@@ -893,7 +957,10 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') document.query
 function toast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
 
 (function init() {
-  const loaded = loadState();
+  // URL hash takes priority over localStorage (shared links)
+  const fromHash = loadFromHash();
+  if (!fromHash) loadState();
+
   renderAll();
   document.getElementById('startMonth').addEventListener('change', function() {
     state.startMonth = parseInt(this.value);
@@ -907,5 +974,11 @@ function toast(msg) { const el=document.getElementById('toast'); el.textContent=
   });
   document.getElementById('startMonth').value = state.startMonth;
   document.getElementById('startYear').value  = state.startYear;
-  if (loaded && state.msStart) renderGantt();
+
+  if (fromHash && state.rows.length > 0) {
+    // Auto-schedule so the recipient sees the full plan immediately
+    runScheduler();
+  } else if (state.msStart) {
+    renderGantt();
+  }
 })();
