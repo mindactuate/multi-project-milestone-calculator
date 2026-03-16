@@ -164,6 +164,7 @@ let state = {
   usedCapacity: null,
   schedulingTimedOut: false,
   lang: 'de',
+  theme: 'dark',
   _nextId: 4
 };
 
@@ -286,6 +287,10 @@ function renderHeader() {
       <div class="header-right">
         <a href="https://github.com/mindactuate/multi-project-milestone-calculator" target="_blank" class="header-link" title="${L('githubTip')}">${GH}<span>${L('githubLabel')}</span></a>
         <a href="https://paypal.me/mindactuate" target="_blank" class="header-link paypal-link" title="${L('paypalTip')}">${PP}<span>${L('paypalLabel')}</span></a>
+        <div class="theme-toggle">
+          <button onclick="setTheme('light')" class="${state.theme==='light'?'active':''}" title="Light">☀</button>
+          <button onclick="setTheme('dark')" class="${state.theme==='dark'?'active':''}" title="Dark">☾</button>
+        </div>
         <div class="lang-toggle">
           <button onclick="setLang('de')" class="${state.lang==='de'?'active':''}">DE</button>
           <button onclick="setLang('en')" class="${state.lang==='en'?'active':''}">EN</button>
@@ -332,7 +337,15 @@ function adjustParallelism(delta) {
 }
 function setLang(lang) { state.lang = lang; document.documentElement.lang = lang; document.title = L('title'); renderAll(); saveState(); }
 
+function setTheme(theme) {
+  state.theme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  renderHeader();
+  saveState();
+}
+
 function renderAll() {
+  document.documentElement.setAttribute('data-theme', state.theme || 'dark');
   renderHeader(); renderDisclaimer(); renderToolbar(); renderStaticLabels(); renderFooter();
   renderMonthSelector(); renderCapacity(); renderTableHeaders(); renderTable();
   if (state.msStart) renderGantt();
