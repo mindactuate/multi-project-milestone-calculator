@@ -62,6 +62,8 @@ const i18n = {
     csvStart:'Start', csvEnd:'Ende', csvWait:'Wartet', csvDep:'AbhängigVon',
     thDep:'Abhängig von',
     exTeams:[{name:'Entwicklung',cap:20},{name:'Design',cap:20},{name:'QA/Test',cap:20}],
+    insertMilestone:'Meilenstein einfügen',
+    insertProject:'+ Projekt',
     footerImpressum:'Impressum', footerDatenschutz:'Datenschutz',
   },
   en: {
@@ -116,6 +118,8 @@ const i18n = {
     csvStart:'Start', csvEnd:'End', csvWait:'Wait', csvDep:'DependsOn',
     thDep:'Depends on',
     exTeams:[{name:'Development',cap:20},{name:'Design',cap:20},{name:'QA/Testing',cap:20}],
+    insertMilestone:'Insert milestone',
+    insertProject:'+ Project',
     footerImpressum:'Legal Notice', footerDatenschutz:'Privacy Policy',
   }
 };
@@ -449,7 +453,7 @@ function renderTableHeaders() {
   state.teams.forEach(team => { html += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`; });
   html += `<th title="${L('waitTip')}" style="cursor:help">🔒</th>`;
   html += `<th style="min-width:140px" title="${L('thDep')}">${L('thDep')}</th>`;
-  html += '<th style="width:40px"></th>';
+  html += '<th style="width:60px"></th>';
   tr.innerHTML = html;
 }
 
@@ -481,7 +485,23 @@ function renderTable() {
     }
   });
 
+  // Compute PT sums per project per team and total
+  const projectSums = {};
+  state.rows.forEach((row, i) => {
+    const key = rowGroupKey[i];
+    if (!projectSums[key]) {
+      projectSums[key] = { total: 0 };
+      state.teams.forEach(t => { projectSums[key][t.id] = 0; });
+    }
+    state.teams.forEach(t => {
+      const v = row.efforts[t.id] || 0;
+      projectSums[key][t.id] += v;
+      projectSums[key].total += v;
+    });
+  });
+
   const seenProjects = new Set();
+  let projectGroupIdx = 0;
 
   state.rows.forEach((row, i) => {
     const key = rowGroupKey[i];
@@ -491,12 +511,22 @@ function renderTable() {
     const prioIdx = projectOrder.indexOf(key);
     const isFirstProject = prioIdx === 0;
     const isLastProject = prioIdx === projectOrder.length - 1;
+    const bandClass = prioIdx % 2 === 0 ? 'band-even' : 'band-odd';
+
+    // Find last row index of this project group
+    let lastInGroup = i;
+    for (let k = i + 1; k < state.rows.length; k++) {
+      if (rowGroupKey[k] === key) lastInGroup = k; else break;
+    }
+    const isLast = (i === lastInGroup);
 
     const tr = document.createElement('tr');
+    tr.className = bandClass;
     let html = '';
 
     if (isFirst) {
-      const msCount = projectCount[key];
+      // +1 for the summary row
+      const msCount = projectCount[key] + 1;
       // Use escJS() for the project name inside the single-quoted JS string
       const projJS = escJS(row.project);
       html += `<td rowspan="${msCount}"><div class="prio-cell">
@@ -532,9 +562,40 @@ function renderTable() {
     });
     depHtml += '</select>';
     html += `<td>${depHtml}</td>`;
-    html += `<td><button class="row-del" onclick="deleteRow(${i})">×</button></td>`;
+    // Actions: insert milestone below + delete
+    html += `<td><div class="row-actions"><button class="row-insert" onclick="insertRow(${i + 1})" title="${L('insertMilestone')}">+</button><button class="row-del" onclick="deleteRow(${i})">×</button></div></td>`;
     tr.innerHTML = html; body.appendChild(tr);
+
+    // After last milestone of a project group: render summary row
+    if (isLast) {
+      const sumTr = document.createElement('tr');
+      sumTr.className = `${bandClass} project-sum-row`;
+      let sumHtml = `<td colspan="2" class="sum-label">Σ ${esc(row.project)}</td>`;
+      state.teams.forEach(team => {
+        sumHtml += `<td class="sum-value">${projectSums[key][team.id]}</td>`;
+      });
+      // Empty cells for lock, dep, actions columns
+      sumHtml += `<td></td><td></td><td><button class="row-insert-project" onclick="insertProjectAfter(${lastInGroup})" title="${L('insertProject')}">${L('insertProject')}</button></td>`;
+      sumTr.innerHTML = sumHtml; body.appendChild(sumTr);
+      projectGroupIdx++;
+    }
   });
+}
+
+function insertRow(atIndex) {
+  const efforts = {}; state.teams.forEach(t => { efforts[t.id] = 0; });
+  // Inherit project name from preceding row if available
+  const prevProject = atIndex > 0 ? state.rows[atIndex - 1].project : '';
+  state.rows.splice(atIndex, 0, { project: prevProject, milestone:'', efforts, canOverlap: true, waitFor: null });
+  renderTable();
+  scheduleSave();
+}
+
+function insertProjectAfter(afterIndex) {
+  const efforts = {}; state.teams.forEach(t => { efforts[t.id] = 0; });
+  state.rows.splice(afterIndex + 1, 0, { project:'', milestone:'', efforts, canOverlap: true, waitFor: null });
+  renderTable();
+  scheduleSave();
 }
 
 function toggleRowOverlap(i) {
@@ -906,6 +967,7 @@ function runScheduler() {
   state.msEnd = msEnd;
   state.usedCapacity = used;
   renderGantt();
+  renderCapMonthly();
   saveState();
   toast(L('toastScheduled'));
 }

@@ -102,6 +102,23 @@ td input[type="number"] { width:70px; text-align:right; }
 .dep-select:focus { outline:none; border-color:var(--accent); color:var(--text); }
 .dep-select option { background:var(--bg2); }
 
+/* ── Banded project rows ── */
+tbody tr.band-even { background:var(--bg2); }
+tbody tr.band-odd { background:var(--bg); }
+tbody tr.band-even:hover, tbody tr.band-odd:hover { background:var(--bg3); }
+
+/* ── Project summary row ── */
+.project-sum-row td { border-bottom:2px solid var(--border); padding:4px 12px; }
+.sum-label { font-family:var(--mono); font-size:11px; font-weight:700; color:var(--text2); text-align:right; white-space:nowrap; }
+.sum-value { font-family:var(--mono); font-size:11px; font-weight:700; color:var(--accent); text-align:right; }
+
+/* ── Row action buttons ── */
+.row-actions { display:flex; gap:2px; align-items:center; }
+.row-insert { width:28px; height:28px; border:none; background:none; color:var(--text2); cursor:pointer; border-radius:4px; font-size:16px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; }
+.row-insert:hover { background:var(--accent); color:#fff; }
+.row-insert-project { font-family:var(--mono); font-size:10px; font-weight:600; padding:3px 8px; border:1px dashed var(--border); border-radius:4px; background:none; color:var(--text2); cursor:pointer; white-space:nowrap; transition:all .15s; }
+.row-insert-project:hover { border-color:var(--accent); color:var(--accent); }
+
 .ms-lock { width:28px; height:28px; border:none; background:none; cursor:pointer; border-radius:4px; font-size:14px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
 .ms-lock.locked { color:var(--orange); }
 .ms-lock.unlocked { color:var(--green); }
