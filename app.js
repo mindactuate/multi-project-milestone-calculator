@@ -400,13 +400,16 @@ function saveState() {
     const dot = document.getElementById('saveDot');
     const st  = document.getElementById('saveStatus');
     dot.classList.add('saving'); st.textContent = L('saving');
-    localStorage.setItem('scheduler_v4', JSON.stringify({
+    const payload = JSON.stringify({
       activePlanningId,
       lang: state.lang,
       theme: state.theme,
       _planNextId,
       plannings
-    }));
+    });
+    localStorage.setItem('scheduler_v4', payload);
+    // Set cooldown so the echo from another tab's merge-save is ignored
+    _tabSyncCooldown = Date.now();
     setTimeout(() => {
       dot.classList.remove('saving');
       st.textContent = L('saved')+' '+new Date().toLocaleTimeString(state.lang==='de'?'de-DE':'en-US');
