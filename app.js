@@ -65,6 +65,15 @@ const i18n = {
     insertMilestone:'Meilenstein einfügen',
     insertProject:'+ Projekt',
     footerImpressum:'Impressum', footerDatenschutz:'Datenschutz',
+    planningNew:'+ Neue Planung', planningDelete:'Planung löschen?', planningDefault:'Planung',
+    planningShared:'Geteilte Planung', toastPlanningCreated:'Neue Planung erstellt',
+    toastPlanningDeleted:'Planung gelöscht', planningMinOne:'Mindestens eine Planung erforderlich',
+    planningRenameTip:'Doppelklick zum Umbenennen',
+    bottleneckTitle:'Engpass-Analyse',
+    bottleneckHint:'Welche Kapazitätserhöhung (+5 PT/Monat) verkürzt den Plan am meisten?',
+    bottleneckResult:(team,inc,delta) => `${team} +${inc} PT/Monat → Gesamtplan ${Math.abs(delta)} ${Math.abs(delta)===1?'Monat':'Monate'} kürzer`,
+    bottleneckProject:(proj,delta) => `${proj}: ${Math.abs(delta)} ${Math.abs(delta)===1?'Monat':'Monate'} früher`,
+    bottleneckNoEffect:(team,inc) => `${team} +${inc} PT/Monat → kein Zeitgewinn`,
   },
   en: {
     months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
@@ -121,6 +130,15 @@ const i18n = {
     insertMilestone:'Insert milestone',
     insertProject:'+ Project',
     footerImpressum:'Legal Notice', footerDatenschutz:'Privacy Policy',
+    planningNew:'+ New Planning', planningDelete:'Delete planning?', planningDefault:'Planning',
+    planningShared:'Shared Planning', toastPlanningCreated:'New planning created',
+    toastPlanningDeleted:'Planning deleted', planningMinOne:'At least one planning required',
+    planningRenameTip:'Double-click to rename',
+    bottleneckTitle:'Bottleneck Analysis',
+    bottleneckHint:'Which capacity increase (+5 PD/month) shortens the plan the most?',
+    bottleneckResult:(team,inc,delta) => `${team} +${inc} PD/month → overall plan ${Math.abs(delta)} ${Math.abs(delta)===1?'month':'months'} shorter`,
+    bottleneckProject:(proj,delta) => `${proj}: ${Math.abs(delta)} ${Math.abs(delta)===1?'month':'months'} earlier`,
+    bottleneckNoEffect:(team,inc) => `${team} +${inc} PD/month → no time savings`,
   }
 };
 
@@ -157,7 +175,7 @@ let state = {
   rows: [],
   startMonth: 0,
   startYear: 2026,
-  strategy: 'parallel',
+  strategy: 'speed',
   parallelism: 2,   // max simultaneous projects in parallel mode; 0 = unlimited (legacy behaviour)
   msStart: null,
   msEnd: null,
@@ -167,6 +185,155 @@ let state = {
   theme: 'dark',
   _nextId: 4
 };
+
+// ═══════════════════════════════════════════════════════
+//  Multiple Plannings
+// ═══════════════════════════════════════════════════════
+let plannings = [];
+let activePlanningId = null;
+let _planNextId = 1;
+function newPlanId() { return 'p' + (_planNextId++); }
+
+function defaultPlanningData() {
+  return {
+    teams: [
+      { id:'t1', name:'Team A', capacity:20, color:PALETTE[0], capOverrides:{} },
+      { id:'t2', name:'Team B', capacity:20, color:PALETTE[1], capOverrides:{} },
+      { id:'t3', name:'Team C', capacity:20, color:PALETTE[2], capOverrides:{} },
+    ],
+    rows: [],
+    startMonth: 0,
+    startYear: new Date().getFullYear(),
+    strategy: 'speed',
+    parallelism: 2,
+    msStart: null,
+    msEnd: null,
+    usedCapacity: null,
+    schedulingTimedOut: false,
+    _nextId: 4
+  };
+}
+
+function syncStateToPlannings() {
+  const idx = plannings.findIndex(p => p.id === activePlanningId);
+  if (idx < 0) return;
+  const name = plannings[idx].name;
+  state._nextId = _nextId;
+  plannings[idx] = { id: activePlanningId, name, teams: state.teams, rows: state.rows,
+    startMonth: state.startMonth, startYear: state.startYear, strategy: state.strategy,
+    parallelism: state.parallelism, msStart: state.msStart, msEnd: state.msEnd,
+    usedCapacity: state.usedCapacity, schedulingTimedOut: state.schedulingTimedOut,
+    _nextId: _nextId };
+}
+
+function loadPlanningIntoState(planning) {
+  activePlanningId = planning.id;
+  state.teams = planning.teams || defaultPlanningData().teams;
+  state.rows = planning.rows || [];
+  state.startMonth = planning.startMonth || 0;
+  state.startYear = planning.startYear || new Date().getFullYear();
+  state.strategy = planning.strategy || 'parallel';
+  state.parallelism = planning.parallelism != null ? planning.parallelism : 2;
+  state.msStart = planning.msStart || null;
+  state.msEnd = planning.msEnd || null;
+  state.usedCapacity = planning.usedCapacity || null;
+  state.schedulingTimedOut = planning.schedulingTimedOut || false;
+  _nextId = planning._nextId || 4;
+}
+
+function switchPlanning(id) {
+  if (id === activePlanningId) return;
+  syncStateToPlannings();
+  const planning = plannings.find(p => p.id === id);
+  if (!planning) return;
+  loadPlanningIntoState(planning);
+  renderAll();
+  document.getElementById('startMonth').value = state.startMonth;
+  document.getElementById('startYear').value  = state.startYear;
+  if (state.msStart) renderGantt(); else hideSchedule();
+  saveState();
+}
+
+function createPlanning(name) {
+  syncStateToPlannings();
+  const id = newPlanId();
+  const data = defaultPlanningData();
+  const planning = { id, name: name || (L('planningDefault') + ' ' + (plannings.length + 1)), ...data };
+  plannings.push(planning);
+  loadPlanningIntoState(planning);
+  renderAll();
+  document.getElementById('startMonth').value = state.startMonth;
+  document.getElementById('startYear').value  = state.startYear;
+  hideSchedule();
+  saveState();
+  toast(L('toastPlanningCreated'));
+}
+
+function renamePlanning(id, newName) {
+  const planning = plannings.find(p => p.id === id);
+  if (!planning || !newName.trim()) return;
+  planning.name = newName.trim();
+  renderPlanningBar();
+  saveState();
+}
+
+function deletePlanning(id) {
+  if (plannings.length <= 1) { toast(L('planningMinOne')); return; }
+  try { if (!confirm(L('planningDelete'))) return; } catch(e) {}
+  const idx = plannings.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  plannings.splice(idx, 1);
+  if (id === activePlanningId) {
+    const newActive = plannings[Math.min(idx, plannings.length - 1)];
+    loadPlanningIntoState(newActive);
+    renderAll();
+    document.getElementById('startMonth').value = state.startMonth;
+    document.getElementById('startYear').value  = state.startYear;
+    if (state.msStart) renderGantt(); else hideSchedule();
+  } else {
+    renderPlanningBar();
+  }
+  saveState();
+  toast(L('toastPlanningDeleted'));
+}
+
+function startRenamePlanning(id) {
+  const tab = document.querySelector(`.planning-tab[data-id="${id}"] .tab-name`);
+  if (!tab) return;
+  const planning = plannings.find(p => p.id === id);
+  if (!planning) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = planning.name;
+  input.className = 'tab-rename-input';
+  input.style.cssText = 'font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--accent);border-radius:3px;padding:1px 4px;width:' + Math.max(80, planning.name.length * 8) + 'px;outline:none;';
+  const finish = () => {
+    const val = input.value.trim();
+    if (val && val !== planning.name) renamePlanning(id, val);
+    else renderPlanningBar();
+  };
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.value = planning.name; input.blur(); } });
+  tab.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function renderPlanningBar() {
+  const bar = document.getElementById('planningBar');
+  if (!bar) return;
+  let html = '<div class="planning-bar">';
+  plannings.forEach(p => {
+    const active = p.id === activePlanningId ? ' active' : '';
+    html += `<div class="planning-tab${active}" data-id="${p.id}">
+      <span class="tab-name" onclick="switchPlanning('${p.id}')" ondblclick="startRenamePlanning('${p.id}')" title="${esc(L('planningRenameTip'))}">${esc(p.name)}</span>
+      ${plannings.length > 1 ? `<button class="tab-del" onclick="event.stopPropagation();deletePlanning('${p.id}')" title="×">×</button>` : ''}
+    </div>`;
+  });
+  html += `<button class="planning-add" onclick="createPlanning()">${L('planningNew')}</button>`;
+  html += '</div>';
+  bar.innerHTML = html;
+}
 
 function L(k) { return i18n[state.lang][k]; }
 
@@ -198,11 +365,17 @@ try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); storageOk
 function saveState() {
   if (!storageOk) return;
   try {
-    state._nextId = _nextId;
+    syncStateToPlannings();
     const dot = document.getElementById('saveDot');
     const st  = document.getElementById('saveStatus');
     dot.classList.add('saving'); st.textContent = L('saving');
-    localStorage.setItem('scheduler_v3', JSON.stringify(state));
+    localStorage.setItem('scheduler_v4', JSON.stringify({
+      activePlanningId,
+      lang: state.lang,
+      theme: state.theme,
+      _planNextId,
+      plannings
+    }));
     setTimeout(() => {
       dot.classList.remove('saving');
       st.textContent = L('saved')+' '+new Date().toLocaleTimeString(state.lang==='de'?'de-DE':'en-US');
@@ -217,8 +390,35 @@ function saveState() {
 function loadState() {
   if (!storageOk) return false;
   try {
-    const d = localStorage.getItem('scheduler_v3');
-    if (d) { state = { ...state, ...JSON.parse(d) }; _nextId = state._nextId || 4; return true; }
+    // Try v4 format first
+    const d4 = localStorage.getItem('scheduler_v4');
+    if (d4) {
+      const wrapper = JSON.parse(d4);
+      plannings = wrapper.plannings || [];
+      activePlanningId = wrapper.activePlanningId;
+      _planNextId = wrapper._planNextId || plannings.length + 1;
+      state.lang = wrapper.lang || 'de';
+      state.theme = wrapper.theme || 'dark';
+      const active = plannings.find(p => p.id === activePlanningId) || plannings[0];
+      if (active) { loadPlanningIntoState(active); return true; }
+    }
+    // Migrate from v3
+    const d3 = localStorage.getItem('scheduler_v3');
+    if (d3) {
+      const old = JSON.parse(d3);
+      state = { ...state, ...old };
+      _nextId = state._nextId || 4;
+      const id = newPlanId();
+      plannings = [{ id, name: L('planningDefault') + ' 1',
+        teams: state.teams, rows: state.rows, startMonth: state.startMonth, startYear: state.startYear,
+        strategy: state.strategy, parallelism: state.parallelism || 2,
+        msStart: state.msStart, msEnd: state.msEnd, usedCapacity: state.usedCapacity,
+        schedulingTimedOut: state.schedulingTimedOut, _nextId }];
+      activePlanningId = id;
+      localStorage.removeItem('scheduler_v3');
+      saveState();
+      return true;
+    }
   } catch(e) {}
   return false;
 }
@@ -346,7 +546,7 @@ function setTheme(theme) {
 
 function renderAll() {
   document.documentElement.setAttribute('data-theme', state.theme || 'dark');
-  renderHeader(); renderDisclaimer(); renderToolbar(); renderStaticLabels(); renderFooter();
+  renderHeader(); renderDisclaimer(); renderPlanningBar(); renderToolbar(); renderStaticLabels(); renderFooter();
   renderMonthSelector(); renderCapacity(); renderTableHeaders(); renderTable();
   if (state.msStart) renderGantt();
 }
@@ -462,7 +662,7 @@ function setCapOverride(teamId, month, input) {
 // ═══════════════════════════════════════════════════════
 function renderTableHeaders() {
   const tr = document.getElementById('tableHead');
-  let html = `<th title="${L('prioTip')}" style="cursor:help;width:70px">${L('thPrio')}</th><th>${L('thProject')}</th><th>${L('thMilestone')}</th>`;
+  let html = `<th title="${L('prioTip')}" style="cursor:help;width:70px">${L('thPrio')}</th><th style="min-width:150px">${L('thProject')}</th><th style="min-width:150px">${L('thMilestone')}</th>`;
   state.teams.forEach(team => { html += `<th style="color:${team.color}">${esc(team.name)} (PT)</th>`; });
   html += `<th title="${L('waitTip')}" style="cursor:help">🔒</th>`;
   html += `<th style="min-width:140px" title="${L('thDep')}">${L('thDep')}</th>`;
@@ -551,10 +751,10 @@ function renderTable() {
       </div></td>`;
     }
 
-    html += `<td><input type="text" value="${esc(row.project)}" oninput="state.rows[${i}].project=this.value;scheduleSave()" placeholder="${L('phProject')}"></td>
-      <td><input type="text" value="${esc(row.milestone)}" oninput="state.rows[${i}].milestone=this.value;scheduleSave()" placeholder="${L('phMilestone')}"></td>`;
+    html += `<td><input type="text" value="${esc(row.project)}" oninput="state.rows[${i}].project=this.value;scheduleSave()" onchange="state.rows[${i}].project=this.value;saveState();renderTable()" placeholder="${L('phProject')}"></td>
+      <td><input type="text" value="${esc(row.milestone)}" oninput="state.rows[${i}].milestone=this.value;scheduleSave()" onchange="state.rows[${i}].milestone=this.value;saveState();renderTable()" placeholder="${L('phMilestone')}"></td>`;
     state.teams.forEach(team => {
-      html += `<td><input type="number" min="0" value="${row.efforts[team.id]||0}" oninput="state.rows[${i}].efforts['${team.id}']=Math.max(0,parseFloat(this.value)||0);scheduleSave()"></td>`;
+      html += `<td><input type="number" min="0" value="${row.efforts[team.id]||0}" oninput="state.rows[${i}].efforts['${team.id}']=Math.max(0,parseFloat(this.value)||0);scheduleSave()" onchange="state.rows[${i}].efforts['${team.id}']=Math.max(0,parseFloat(this.value)||0);saveState();renderTable()"></td>`;
     });
 
     if (isFirst) {
@@ -789,23 +989,20 @@ function exportCSV() {
 // ═══════════════════════════════════════════════════════
 //  SCHEDULER — Multi-month simulation
 // ═══════════════════════════════════════════════════════
-function runScheduler() {
-  if (state.rows.length === 0) { toast(L('toastNoData')); return; }
-  if (state.rows.some(r => !r.project.trim() || !r.milestone.trim())) { toast(L('toastEmptyNames')); return; }
-  // State is kept in sync by oninput handlers — no DOM re-read needed
-
+// Pure scheduling function — no side effects, no global state access
+function simulateSchedule(rows, teams, strategy, parallelism) {
   const projects = {}, order = [];
-  state.rows.forEach((r,i) => {
+  rows.forEach((r,i) => {
     if (!projects[r.project]) { projects[r.project]=[]; order.push(r.project); }
     projects[r.project].push({ ...r, idx:i });
   });
 
-  const N = state.rows.length;
+  const N = rows.length;
   const MAX = 48;
 
-  const rem = state.rows.map(r => {
+  const rem = rows.map(r => {
     const o = {};
-    state.teams.forEach(t => { o[t.id] = r.efforts[t.id] || 0; });
+    teams.forEach(t => { o[t.id] = r.efforts[t.id] || 0; });
     return o;
   });
 
@@ -814,7 +1011,7 @@ function runScheduler() {
   const used    = {};
 
   function isMsDone(idx) {
-    return state.teams.every(t => rem[idx][t.id] <= 0);
+    return teams.every(t => rem[idx][t.id] <= 0);
   }
 
   function allDone() {
@@ -823,7 +1020,7 @@ function runScheduler() {
   }
 
   function ensureUsed(m) {
-    if (!used[m]) { used[m] = {}; state.teams.forEach(t => { used[m][t.id] = 0; }); }
+    if (!used[m]) { used[m] = {}; teams.forEach(t => { used[m][t.id] = 0; }); }
   }
 
   function allocate(month, idx, teamId, amount) {
@@ -839,10 +1036,8 @@ function runScheduler() {
 
   function getEligible(teamId, doneBeforeMonth) {
     const eligible = [];
-    // In parallel mode, limit to top-N projects by priority order.
-    // parallelism === 0 means unlimited (legacy "all projects" behaviour).
-    const maxProjects = (state.strategy === 'parallel' && state.parallelism > 0)
-      ? state.parallelism
+    const maxProjects = (strategy === 'parallel' && parallelism > 0)
+      ? parallelism
       : Infinity;
     let projsContributing = 0;
 
@@ -854,17 +1049,16 @@ function runScheduler() {
 
       for (let mi = 0; mi < milestones.length; mi++) {
         const idx = milestones[mi].idx;
-        const row = state.rows[idx];
+        const row = rows[idx];
         const teamDone = rem[idx][teamId] <= 0;
 
-        // Cross-project dependency: milestone blocked until another milestone is fully done
         if (row.waitFor) {
           const sep = row.waitFor.lastIndexOf('/');
           const depProj = row.waitFor.slice(0, sep);
           const depMs   = row.waitFor.slice(sep + 1);
-          const depIdx  = state.rows.findIndex(r => r.project === depProj && r.milestone === depMs);
+          const depIdx  = rows.findIndex(r => r.project === depProj && r.milestone === depMs);
           if (depIdx >= 0 && !doneBeforeMonth.has(depIdx)) {
-            break; // nothing eligible in this project past the blocked milestone
+            break;
           }
         }
 
@@ -894,11 +1088,11 @@ function runScheduler() {
     const doneBeforeMonth = new Set();
     for (let i = 0; i < N; i++) { if (isMsDone(i)) doneBeforeMonth.add(i); }
 
-    state.teams.forEach(team => {
+    teams.forEach(team => {
       let cap = getTeamCap(team, month);
       if (cap <= 0) return;
 
-      if (state.strategy === 'speed') {
+      if (strategy === 'speed') {
         let safety = 0;
         while (cap > 0.001 && safety++ < 50) {
           const eligible = getEligible(team.id, doneBeforeMonth);
@@ -909,8 +1103,6 @@ function runScheduler() {
           if (spent === 0) break;
         }
       } else {
-        // Parallel: re-evaluate eligible after each full round so newly unblocked milestones
-        // (🔓 predecessor just finished this month) can absorb remaining budget.
         let budget = cap;
         let outerSafety = 0;
         while (budget > 0.001 && outerSafety++ < 10) {
@@ -920,7 +1112,6 @@ function runScheduler() {
           if (totalAvailNeed <= 0) break;
           const roundBudget = Math.min(budget, totalAvailNeed);
 
-          // Multi-pass within this eligible set — redistributes surplus from capped items
           let pending = [...eligible];
           let remaining = roundBudget;
           let innerSafety = 0;
@@ -946,7 +1137,7 @@ function runScheduler() {
 
           const usedThisRound = roundBudget - remaining;
           budget -= usedThisRound;
-          if (usedThisRound < 0.001) break; // no progress — avoid infinite loop
+          if (usedThisRound < 0.001) break;
         }
       }
     });
@@ -956,12 +1147,11 @@ function runScheduler() {
     }
   }
 
-  // Flag if simulation timed out before all milestones were done
-  state.schedulingTimedOut = !allDone();
+  const timedOut = !allDone();
 
   // Handle zero-effort milestones and unfinished ones
   for (let i = 0; i < N; i++) {
-    const totalEffort = state.teams.reduce((s, t) => s + (state.rows[i].efforts[t.id] || 0), 0);
+    const totalEffort = teams.reduce((s, t) => s + (rows[i].efforts[t.id] || 0), 0);
     if (totalEffort === 0) {
       for (const proj of order) {
         const ms = projects[proj];
@@ -976,13 +1166,78 @@ function runScheduler() {
     if (msEnd[i] === -1) msEnd[i] = MAX - 1;
   }
 
-  state.msStart = msStart;
-  state.msEnd = msEnd;
-  state.usedCapacity = used;
+  return { msStart, msEnd, usedCapacity: used, timedOut };
+}
+
+function runScheduler() {
+  if (state.rows.length === 0) { toast(L('toastNoData')); return; }
+  if (state.rows.some(r => !r.project.trim() || !r.milestone.trim())) { toast(L('toastEmptyNames')); return; }
+
+  const result = simulateSchedule(state.rows, state.teams, state.strategy, state.parallelism);
+  state.msStart = result.msStart;
+  state.msEnd = result.msEnd;
+  state.usedCapacity = result.usedCapacity;
+  state.schedulingTimedOut = result.timedOut;
+
   renderGantt();
   renderCapMonthly();
   saveState();
   toast(L('toastScheduled'));
+}
+
+// ── Bottleneck Analysis ──
+function runBottleneckAnalysis() {
+  if (!state.msEnd || state.rows.length === 0) return [];
+
+  // Baseline: project end months
+  const projectEndBaseline = {};
+  state.rows.forEach((r, i) => {
+    if (!projectEndBaseline[r.project] || state.msEnd[i] > projectEndBaseline[r.project])
+      projectEndBaseline[r.project] = state.msEnd[i];
+  });
+  const baselineTotal = Math.max(...Object.values(projectEndBaseline));
+
+  const CAP_INCREASE = 5;
+  const results = [];
+
+  state.teams.forEach(team => {
+    // Deep-copy teams with this team's capacity increased
+    const modTeams = state.teams.map(t => {
+      if (t.id === team.id) {
+        return { ...t, capacity: t.capacity + CAP_INCREASE, capOverrides: { ...t.capOverrides } };
+      }
+      return { ...t, capOverrides: { ...t.capOverrides } };
+    });
+
+    const sim = simulateSchedule(state.rows, modTeams, state.strategy, state.parallelism);
+
+    // Project end months in this simulation
+    const projectEndSim = {};
+    state.rows.forEach((r, i) => {
+      if (!projectEndSim[r.project] || sim.msEnd[i] > projectEndSim[r.project])
+        projectEndSim[r.project] = sim.msEnd[i];
+    });
+    const simTotal = Math.max(...Object.values(projectEndSim));
+
+    const projectDeltas = [];
+    Object.keys(projectEndBaseline).forEach(proj => {
+      const delta = (projectEndSim[proj] || 0) - (projectEndBaseline[proj] || 0);
+      if (delta < 0) projectDeltas.push({ project: proj, delta });
+    });
+    projectDeltas.sort((a, b) => a.delta - b.delta);
+
+    results.push({
+      teamId: team.id,
+      teamName: team.name,
+      capIncrease: CAP_INCREASE,
+      totalDelta: simTotal - baselineTotal,
+      projectDeltas
+    });
+  });
+
+  // Sort: biggest improvement first
+  results.sort((a, b) => a.totalDelta - b.totalDelta);
+  return results;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1084,8 +1339,24 @@ function renderWarnings(num) {
     w.unshift({type:'ok', text: L('warnOk')});
   }
 
+  // Bottleneck analysis
+  let bottleneckHtml = '';
+  const bn = runBottleneckAnalysis();
+  if (bn.length > 0) {
+    bottleneckHtml = `<li class="bottleneck-section"><strong>${L('bottleneckTitle')}</strong><span class="bottleneck-hint">${L('bottleneckHint')}</span></li>`;
+    bn.forEach((r, idx) => {
+      if (r.totalDelta < 0) {
+        const icon = idx === 0 ? '🏆' : '📊';
+        let detail = r.projectDeltas.map(pd => L('bottleneckProject')(pd.project, pd.delta)).join(' · ');
+        bottleneckHtml += `<li class="bottleneck-item improvement">${icon} ${L('bottleneckResult')(r.teamName, r.capIncrease, r.totalDelta)}${detail ? `<div class="bottleneck-detail">${detail}</div>` : ''}</li>`;
+      } else {
+        bottleneckHtml += `<li class="bottleneck-item neutral">○ ${L('bottleneckNoEffect')(r.teamName, r.capIncrease)}</li>`;
+      }
+    });
+  }
+
   document.getElementById('warnPanel').style.display = '';
-  document.getElementById('warnings').innerHTML = w.map(x => `<li class="${x.type}">${x.text}</li>`).join('');
+  document.getElementById('warnings').innerHTML = w.map(x => `<li class="${x.type}">${x.text}</li>`).join('') + bottleneckHtml;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1139,6 +1410,7 @@ async function encodeStateToHash() {
     startMonth: state.startMonth,
     startYear: state.startYear,
     strategy: state.strategy,
+    parallelism: state.parallelism,
     lang: state.lang,
     _nextId: _nextId,
   };
@@ -1195,10 +1467,28 @@ async function loadFromHash() {
   if (!hash.startsWith('#share=')) return false;
   const decoded = await decodeHashToState(hash.slice(7));
   if (!decoded || !decoded.rows || !decoded.teams) return false;
-  state = { ...state, ...decoded };
-  _nextId = state._nextId || 4;
-  // Remove hash from URL so refreshing doesn't re-apply it over saved changes
+  // Remove hash from URL so refreshing doesn't re-apply it
   history.replaceState(null, '', location.pathname);
+  // Determine a name for the shared planning
+  const projects = [...new Set(decoded.rows.map(r => r.project).filter(Boolean))];
+  const sharedName = projects.length > 0
+    ? projects.slice(0, 2).join(', ') + (projects.length > 2 ? ' …' : '')
+    : L('planningShared');
+  // Save current planning if one exists
+  if (activePlanningId) syncStateToPlannings();
+  // Create a new planning from the shared data
+  const id = newPlanId();
+  const planning = {
+    id, name: sharedName,
+    teams: decoded.teams, rows: decoded.rows,
+    startMonth: decoded.startMonth || 0, startYear: decoded.startYear || new Date().getFullYear(),
+    strategy: decoded.strategy || 'parallel', parallelism: decoded.parallelism != null ? decoded.parallelism : 2,
+    msStart: null, msEnd: null, usedCapacity: null, schedulingTimedOut: false,
+    _nextId: decoded._nextId || 4
+  };
+  plannings.push(planning);
+  loadPlanningIntoState(planning);
+  if (decoded.lang) state.lang = decoded.lang;
   return true;
 }
 
@@ -1216,9 +1506,18 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') document.query
 function toast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
 
 (async function init() {
-  // URL hash takes priority over localStorage (shared links)
+  // Load existing data from localStorage first (needed for loadFromHash to add to plannings)
+  loadState();
+  // URL hash takes priority — adds a new planning from shared link
   const fromHash = await loadFromHash();
-  if (!fromHash) loadState();
+  // If no plannings exist at all, create a default one
+  if (plannings.length === 0) {
+    const id = newPlanId();
+    const data = defaultPlanningData();
+    plannings = [{ id, name: L('planningDefault') + ' 1', ...data }];
+    activePlanningId = id;
+    loadPlanningIntoState(plannings[0]);
+  }
 
   renderAll();
   document.getElementById('startMonth').addEventListener('change', function() {
@@ -1238,6 +1537,7 @@ function toast(msg) { const el=document.getElementById('toast'); el.textContent=
   if (fromHash && state.rows.length > 0) {
     // Auto-schedule so the recipient sees the full plan immediately
     runScheduler();
+    saveState();
   } else if (state.msStart) {
     renderGantt();
   }

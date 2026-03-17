@@ -44,11 +44,18 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 - Click the color badge to cycle through 15 colors
 - At least one team is always required
 
+### Multiple Plannings
+- **Create, switch, rename, and delete** multiple independent plannings within a single browser
+- **Tab-based UI** — planning tabs above the toolbar; double-click to rename, × to delete
+- **Share link adds a new planning** — recipients keep their existing plannings; the shared data is added as a new tab instead of overwriting
+- Seamless switching between plannings with full state preservation (teams, rows, schedule, capacity overrides)
+- Automatic migration from single-planning format (v3 → v4) — existing data is preserved
+
 ### Data Management
 - **CSV Import** — load your project data from a CSV file (`;` or `,` separated, auto-detected)
 - **CSV Export** — full round-trip fidelity: team capacities, monthly overrides, lock states, cross-project dependencies, and scheduled months are all preserved
 - **Auto-save** — state is continuously saved to `localStorage`
-- **Share link** — encodes the full plan as a gzip-compressed URL hash; recipients open it instantly with no setup
+- **Share link** — encodes the full plan as a gzip-compressed URL hash; recipients get it as a new planning tab
 - **Example data** — one-click load of 8 sample projects with 19 milestones
 - Inline editing of all fields directly in the table
 
@@ -56,6 +63,9 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 - **Gantt Chart** — multi-month color-coded bars per project, showing total effort and duration
 - **Capacity Heatmap** — per-team utilization bars for each month (green = ok, red = overloaded)
 - **Analysis Panel** — capacity warnings, plus project completion dates
+- **Bottleneck Analysis** — after scheduling, automatically simulates +5 PD/month per team and shows which capacity increase shortens the plan the most (e.g., "Development +5 PD/month → overall plan 2 months shorter")
+- **Sticky table header** — column headers stay visible when scrolling through many rows
+- **Responsive columns** — project and milestone columns maintain readable widths even with many teams
 
 ### Internationalization
 - Full **German (DE)** and **English (EN)** UI

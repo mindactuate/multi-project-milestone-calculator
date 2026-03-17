@@ -35,6 +35,18 @@ header h1 span { color:var(--accent); }
 
 .disclaimer-bar { font-family:var(--mono); font-size:12px; font-weight:600; color:var(--green); background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.35); border-radius:var(--radius); padding:12px 18px; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
 
+/* ── Planning bar (tabs) ── */
+.planning-bar { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+.planning-tab { font-family:var(--mono); font-size:12px; padding:6px 14px; border:1px solid var(--border); border-radius:var(--radius) var(--radius) 0 0; background:var(--bg2); color:var(--text2); cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .15s; }
+.planning-tab:hover { border-color:var(--text2); color:var(--text); }
+.planning-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.planning-tab .tab-name { cursor:pointer; }
+.planning-tab .tab-del { width:18px; height:18px; border:none; background:none; color:inherit; cursor:pointer; border-radius:3px; font-size:13px; display:flex; align-items:center; justify-content:center; opacity:0.5; padding:0; font-family:var(--mono); }
+.planning-tab .tab-del:hover { opacity:1; background:rgba(239,68,68,.3); color:var(--red); }
+.planning-tab.active .tab-del:hover { background:rgba(255,255,255,.2); color:#fff; }
+.planning-add { font-family:var(--mono); font-size:12px; padding:6px 14px; border:2px dashed var(--border); border-radius:var(--radius); background:none; color:var(--text2); cursor:pointer; transition:all .15s; }
+.planning-add:hover { border-color:var(--accent); color:var(--accent); }
+
 .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px; align-items:center; }
 .btn { font-family:var(--mono); font-size:12px; font-weight:500; padding:8px 16px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg2); color:var(--text); cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:6px; white-space:nowrap; }
 .btn:hover { border-color:var(--accent); color:var(--accent); }
@@ -92,9 +104,9 @@ header h1 span { color:var(--accent); }
 .settings-row select, .settings-row input[type="number"] { font-family:var(--mono); font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); }
 .settings-row select:focus, .settings-row input:focus { outline:none; border-color:var(--accent); }
 
-.table-wrap { overflow-x:auto; margin:0 -18px; padding:0 18px; }
+.table-wrap { overflow-x:auto; overflow-y:auto; max-height:70vh; margin:0 -18px; padding:0 18px; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
-thead th { font-family:var(--mono); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text2); text-align:left; padding:10px 12px; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--bg2); }
+thead th { font-family:var(--mono); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text2); text-align:left; padding:10px 12px; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--bg2); z-index:2; }
 tbody td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
 tbody tr:hover { background:var(--bg3); }
 td input { font-family:var(--mono); font-size:13px; padding:4px 8px; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--text); width:100%; }
@@ -163,6 +175,15 @@ tbody tr.band-even:hover, tbody tr.band-odd:hover { background:var(--bg3); }
 .warning-list li.over { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:var(--red); }
 .warning-list li.ok { background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.3); color:var(--green); }
 .warning-list li.info { background:rgba(78,154,245,.1); border:1px solid rgba(78,154,245,.3); color:var(--accent); }
+
+/* ── Bottleneck analysis ── */
+.bottleneck-section { margin-top:16px; padding:10px 10px 6px !important; border:none !important; background:none !important; display:flex; flex-direction:column; gap:4px; }
+.bottleneck-section strong { font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--accent); }
+.bottleneck-hint { font-family:var(--mono); font-size:10px; color:var(--text2); }
+.bottleneck-item { font-size:12px; padding:6px 10px; margin-bottom:4px; border-radius:4px; display:block; }
+.bottleneck-item.improvement { background:rgba(78,154,245,.1); border:1px solid rgba(78,154,245,.3); color:var(--accent); }
+.bottleneck-item.neutral { background:none; border:1px solid var(--border); color:var(--text2); }
+.bottleneck-detail { font-family:var(--mono); font-size:10px; color:var(--text2); margin-top:3px; padding-left:22px; }
 
 .empty-state { text-align:center; padding:48px 24px; color:var(--text2); font-size:14px; }
 .empty-state code { font-family:var(--mono); background:var(--bg); padding:2px 6px; border-radius:3px; font-size:12px; }
