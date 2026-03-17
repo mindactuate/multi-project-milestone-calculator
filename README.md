@@ -46,8 +46,14 @@ The result is a **Gantt chart** with multi-month bars, a **capacity utilization 
 
 ### Multiple Plannings
 - **Create, switch, rename, and delete** multiple independent plannings within a single browser
+- **Duplicate planning** — one-click deep copy of the active planning (⧉ button on the active tab)
 - **Tab-based UI** — planning tabs above the toolbar; double-click to rename, × to delete
 - **Share link adds a new planning** — recipients keep their existing plannings; the shared data is added as a new tab instead of overwriting
+- **Cross-tab sync** — open the app in multiple browser tabs and changes sync automatically at the planning level:
+  - Edits to non-active plannings are applied silently
+  - If another tab edits the same planning you're working on, a persistent toast lets you **apply** the remote changes when you're ready
+  - If another tab deletes your active planning, an **undo** toast lets you restore it
+  - Language and theme changes sync across all tabs
 - Seamless switching between plannings with full state preservation (teams, rows, schedule, capacity overrides)
 - Automatic migration from single-planning format (v3 → v4) — existing data is preserved
 

@@ -65,8 +65,8 @@ const i18n = {
     insertMilestone:'Meilenstein einfügen',
     insertProject:'+ Projekt',
     footerImpressum:'Impressum', footerDatenschutz:'Datenschutz',
-    planningNew:'+ Neue Planung', planningDelete:'Planung löschen?', planningDefault:'Planung',
-    planningShared:'Geteilte Planung', toastPlanningCreated:'Neue Planung erstellt',
+    planningNew:'+ Neue Planung', planningDuplicate:'Planung duplizieren', planningDelete:'Planung löschen?', planningDefault:'Planung',
+    planningShared:'Geteilte Planung', toastPlanningCreated:'Neue Planung erstellt', toastPlanningDuplicated:'Planung dupliziert',
     toastPlanningDeleted:'Planung gelöscht', planningMinOne:'Mindestens eine Planung erforderlich',
     planningRenameTip:'Doppelklick zum Umbenennen',
     bottleneckTitle:'Engpass-Analyse',
@@ -74,6 +74,11 @@ const i18n = {
     bottleneckResult:(team,inc,delta) => `${team} +${inc} PT/Monat → Gesamtplan ${Math.abs(delta)} ${Math.abs(delta)===1?'Monat':'Monate'} kürzer`,
     bottleneckProject:(proj,delta) => `${proj}: ${Math.abs(delta)} ${Math.abs(delta)===1?'Monat':'Monate'} früher`,
     bottleneckNoEffect:(team,inc) => `${team} +${inc} PT/Monat → kein Zeitgewinn`,
+    toastTabSync:'Planungen aus anderem Tab synchronisiert',
+    toastTabSyncActiveDeleted:'Aktive Planung wurde in anderem Tab gelöscht',
+    toastTabSyncConflict:'Aktive Planung wurde in anderem Tab geändert',
+    toastTabSyncApply:'Übernehmen',
+    undo:'Rückgängig',
   },
   en: {
     months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
@@ -130,8 +135,8 @@ const i18n = {
     insertMilestone:'Insert milestone',
     insertProject:'+ Project',
     footerImpressum:'Legal Notice', footerDatenschutz:'Privacy Policy',
-    planningNew:'+ New Planning', planningDelete:'Delete planning?', planningDefault:'Planning',
-    planningShared:'Shared Planning', toastPlanningCreated:'New planning created',
+    planningNew:'+ New Planning', planningDuplicate:'Duplicate planning', planningDelete:'Delete planning?', planningDefault:'Planning',
+    planningShared:'Shared Planning', toastPlanningCreated:'New planning created', toastPlanningDuplicated:'Planning duplicated',
     toastPlanningDeleted:'Planning deleted', planningMinOne:'At least one planning required',
     planningRenameTip:'Double-click to rename',
     bottleneckTitle:'Bottleneck Analysis',
@@ -139,6 +144,11 @@ const i18n = {
     bottleneckResult:(team,inc,delta) => `${team} +${inc} PD/month → overall plan ${Math.abs(delta)} ${Math.abs(delta)===1?'month':'months'} shorter`,
     bottleneckProject:(proj,delta) => `${proj}: ${Math.abs(delta)} ${Math.abs(delta)===1?'month':'months'} earlier`,
     bottleneckNoEffect:(team,inc) => `${team} +${inc} PD/month → no time savings`,
+    toastTabSync:'Plannings synced from another tab',
+    toastTabSyncActiveDeleted:'Active planning was deleted in another tab',
+    toastTabSyncConflict:'Active planning was changed in another tab',
+    toastTabSyncApply:'Apply',
+    undo:'Undo',
   }
 };
 
@@ -269,6 +279,26 @@ function createPlanning(name) {
   toast(L('toastPlanningCreated'));
 }
 
+function duplicatePlanning(id) {
+  syncStateToPlannings();
+  const source = plannings.find(p => p.id === id);
+  if (!source) return;
+  const newId = newPlanId();
+  const copy = JSON.parse(JSON.stringify(source));
+  copy.id = newId;
+  copy.name = source.name + ' (2)';
+  // Insert right after the source
+  const idx = plannings.findIndex(p => p.id === id);
+  plannings.splice(idx + 1, 0, copy);
+  loadPlanningIntoState(copy);
+  renderAll();
+  document.getElementById('startMonth').value = state.startMonth;
+  document.getElementById('startYear').value  = state.startYear;
+  if (state.msStart) renderGantt(); else hideSchedule();
+  saveState();
+  toast(L('toastPlanningDuplicated'));
+}
+
 function renamePlanning(id, newName) {
   const planning = plannings.find(p => p.id === id);
   if (!planning || !newName.trim()) return;
@@ -327,6 +357,7 @@ function renderPlanningBar() {
     const active = p.id === activePlanningId ? ' active' : '';
     html += `<div class="planning-tab${active}" data-id="${p.id}">
       <span class="tab-name" onclick="switchPlanning('${p.id}')" ondblclick="startRenamePlanning('${p.id}')" title="${esc(L('planningRenameTip'))}">${esc(p.name)}</span>
+      ${active ? `<button class="tab-dup" onclick="event.stopPropagation();duplicatePlanning('${p.id}')" title="${esc(L('planningDuplicate'))}">⧉</button>` : ''}
       ${plannings.length > 1 ? `<button class="tab-del" onclick="event.stopPropagation();deletePlanning('${p.id}')" title="×">×</button>` : ''}
     </div>`;
   });
@@ -422,6 +453,159 @@ function loadState() {
   } catch(e) {}
   return false;
 }
+
+// ═══════════════════════════════════════════════════════
+//  Cross-tab sync via storage event (planning-level merge)
+// ═══════════════════════════════════════════════════════
+let _tabSyncCooldown = 0;
+
+function _showConflictToast(remotePlanning) {
+  toast(L('toastTabSyncConflict'), {
+    label: L('toastTabSyncApply'),
+    persistent: true,
+    fn: () => {
+      const idx = plannings.findIndex(p => p.id === remotePlanning.id);
+      if (idx >= 0) plannings[idx] = remotePlanning;
+      loadPlanningIntoState(remotePlanning);
+      renderAll();
+      document.getElementById('startMonth').value = state.startMonth;
+      document.getElementById('startYear').value  = state.startYear;
+      if (state.msStart) renderGantt(); else hideSchedule();
+      _tabSyncCooldown = Date.now();
+      saveState();
+    }
+  });
+}
+
+window.addEventListener('storage', function(e) {
+  if (e.key !== 'scheduler_v4' || !e.newValue) return;
+  // Cooldown prevents ping-pong: after we save a merged result, the other tab
+  // fires back — ignore events within 2s of our own merge-save.
+  if (Date.now() - _tabSyncCooldown < 2000) return;
+  try {
+    const incoming = JSON.parse(e.newValue);
+    if (!incoming.plannings || !Array.isArray(incoming.plannings)) return;
+
+    // Sync current active planning into local plannings array before merging
+    syncStateToPlannings();
+
+    const incomingMap = new Map(incoming.plannings.map(p => [p.id, p]));
+    const localMap = new Map(plannings.map(p => [p.id, p]));
+
+    const merged = [];
+    const seenIds = new Set();
+    let activeConflict = null; // incoming version of active planning if it differs
+
+    // 1. Walk through incoming plannings (authoritative order)
+    for (const ip of incoming.plannings) {
+      seenIds.add(ip.id);
+      if (ip.id === activePlanningId && localMap.has(ip.id)) {
+        // Keep local version of the active planning (user is working on it)
+        merged.push(localMap.get(ip.id));
+        // Detect if the other tab changed this planning (compare without name, which is cosmetic)
+        const local = localMap.get(ip.id);
+        const localCmp = JSON.stringify({ ...local, name: '' });
+        const incomingCmp = JSON.stringify({ ...ip, name: '' });
+        if (localCmp !== incomingCmp) {
+          activeConflict = ip;
+        }
+      } else {
+        // Accept the incoming version for all non-active plannings
+        merged.push(ip);
+      }
+    }
+
+    // 2. Keep local-only plannings (just created in this tab, not yet in other tab)
+    for (const lp of plannings) {
+      if (!seenIds.has(lp.id)) {
+        merged.push(lp);
+      }
+    }
+
+    // 3. Detect if active planning was deleted in the other tab
+    const activeDeletedRemotely = activePlanningId
+      && !incomingMap.has(activePlanningId)
+      && localMap.has(activePlanningId);
+
+    // 4. Update _planNextId to max of both to avoid ID collisions
+    _planNextId = Math.max(_planNextId, incoming._planNextId || 0);
+
+    // 5. Sync lang/theme from other tab
+    let needFullRender = false;
+    if (incoming.lang && incoming.lang !== state.lang) {
+      state.lang = incoming.lang;
+      document.documentElement.lang = state.lang;
+      document.title = L('title');
+      needFullRender = true;
+    }
+    if (incoming.theme && incoming.theme !== state.theme) {
+      state.theme = incoming.theme;
+      needFullRender = true;
+    }
+
+    plannings = merged;
+
+    if (activeDeletedRemotely) {
+      // Save the deleted planning so we can undo
+      const deletedPlanning = localMap.get(activePlanningId);
+
+      // Switch to another planning (or create a fresh one)
+      if (merged.length > 0) {
+        loadPlanningIntoState(merged[0]);
+        activePlanningId = merged[0].id;
+        renderAll();
+        document.getElementById('startMonth').value = state.startMonth;
+        document.getElementById('startYear').value  = state.startYear;
+        if (state.msStart) renderGantt(); else hideSchedule();
+      } else {
+        createPlanning();
+      }
+
+      // Show toast with undo action
+      if (deletedPlanning) {
+        toast(L('toastTabSyncActiveDeleted'), {
+          label: L('undo'),
+          fn: () => {
+            plannings.push(deletedPlanning);
+            loadPlanningIntoState(deletedPlanning);
+            activePlanningId = deletedPlanning.id;
+            renderAll();
+            document.getElementById('startMonth').value = state.startMonth;
+            document.getElementById('startYear').value  = state.startYear;
+            if (state.msStart) renderGantt(); else hideSchedule();
+            _tabSyncCooldown = Date.now();
+            saveState();
+          }
+        });
+      } else {
+        toast(L('toastTabSyncActiveDeleted'));
+      }
+    } else if (needFullRender) {
+      // Lang or theme changed — full re-render needed
+      renderAll();
+      if (state.msStart) renderGantt();
+      if (activeConflict) {
+        _showConflictToast(activeConflict);
+      } else {
+        toast(L('toastTabSync'));
+      }
+    } else if (activeConflict) {
+      // Active planning was changed in the other tab — let user decide
+      renderPlanningBar();
+      _showConflictToast(activeConflict);
+    } else {
+      // Normal sync — update the planning bar (new/renamed/reordered tabs)
+      renderPlanningBar();
+      toast(L('toastTabSync'));
+    }
+
+    // Persist merged state and set cooldown to avoid ping-pong
+    _tabSyncCooldown = Date.now();
+    saveState();
+  } catch(e) {
+    // Ignore parse errors from corrupted data
+  }
+});
 
 // Debounced save — fires 1.5 s after the last change
 let _saveTimer = null;
@@ -1503,7 +1687,34 @@ function openModal(type) {
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); });
 
-function toast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
+let _toastTimer = null;
+function toast(msg, action) {
+  const el = document.getElementById('toast');
+  clearTimeout(_toastTimer);
+  el.classList.remove('show', 'has-action');
+  // Small delay so CSS transition replays if toast is already visible
+  requestAnimationFrame(() => {
+    if (action) {
+      el.innerHTML = '';
+      const span = document.createElement('span');
+      span.textContent = msg;
+      const btn = document.createElement('button');
+      btn.className = 'toast-undo';
+      btn.textContent = action.label;
+      btn.onclick = () => { el.classList.remove('show', 'has-action'); clearTimeout(_toastTimer); action.fn(); };
+      el.appendChild(span);
+      el.appendChild(btn);
+      el.classList.add('show', 'has-action');
+      if (!action.persistent) {
+        _toastTimer = setTimeout(() => el.classList.remove('show', 'has-action'), 8000);
+      }
+    } else {
+      el.textContent = msg;
+      el.classList.add('show');
+      _toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+  });
+}
 
 (async function init() {
   // Load existing data from localStorage first (needed for loadFromHash to add to plannings)
