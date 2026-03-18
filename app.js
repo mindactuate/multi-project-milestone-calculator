@@ -74,6 +74,7 @@ const i18n = {
     bottleneckResult:(team,inc,delta) => `${team} +${inc} PT/Monat → Gesamtplan ${Math.abs(delta)} ${Math.abs(delta)===1?'Monat':'Monate'} kürzer`,
     bottleneckProject:(proj,delta) => `${proj}: ${Math.abs(delta)} ${Math.abs(delta)===1?'Monat':'Monate'} früher`,
     bottleneckNoEffect:(team,inc) => `${team} +${inc} PT/Monat → kein Zeitgewinn`,
+    bottleneckPartial:(team,inc) => `${team} +${inc} PT/Monat → Gesamtplan unverändert, aber:`,
     toastTabSync:'Planungen aus anderem Tab synchronisiert',
     toastTabSyncActiveDeleted:'Aktive Planung wurde in anderem Tab gelöscht',
     toastTabSyncConflict:'Aktive Planung wurde in anderem Tab geändert',
@@ -144,6 +145,7 @@ const i18n = {
     bottleneckResult:(team,inc,delta) => `${team} +${inc} PD/month → overall plan ${Math.abs(delta)} ${Math.abs(delta)===1?'month':'months'} shorter`,
     bottleneckProject:(proj,delta) => `${proj}: ${Math.abs(delta)} ${Math.abs(delta)===1?'month':'months'} earlier`,
     bottleneckNoEffect:(team,inc) => `${team} +${inc} PD/month → no time savings`,
+    bottleneckPartial:(team,inc) => `${team} +${inc} PD/month → overall unchanged, but:`,
     toastTabSync:'Plannings synced from another tab',
     toastTabSyncActiveDeleted:'Active planning was deleted in another tab',
     toastTabSyncConflict:'Active planning was changed in another tab',
@@ -1413,17 +1415,20 @@ function runBottleneckAnalysis() {
     });
     projectDeltas.sort((a, b) => a.delta - b.delta);
 
+    const sumProjectDeltas = projectDeltas.reduce((s, pd) => s + pd.delta, 0);
+
     results.push({
       teamId: team.id,
       teamName: team.name,
       capIncrease: CAP_INCREASE,
       totalDelta: simTotal - baselineTotal,
-      projectDeltas
+      projectDeltas,
+      sumProjectDeltas
     });
   });
 
-  // Sort: biggest improvement first
-  results.sort((a, b) => a.totalDelta - b.totalDelta);
+  // Sort: biggest improvement first (by total, then by sum of project deltas)
+  results.sort((a, b) => a.totalDelta - b.totalDelta || a.sumProjectDeltas - b.sumProjectDeltas);
   return results;
 }
 
@@ -1536,6 +1541,9 @@ function renderWarnings(num) {
         const icon = idx === 0 ? '🏆' : '📊';
         let detail = r.projectDeltas.map(pd => L('bottleneckProject')(pd.project, pd.delta)).join(' · ');
         bottleneckHtml += `<li class="bottleneck-item improvement">${icon} ${L('bottleneckResult')(r.teamName, r.capIncrease, r.totalDelta)}${detail ? `<div class="bottleneck-detail">${detail}</div>` : ''}</li>`;
+      } else if (r.projectDeltas.length > 0) {
+        let detail = r.projectDeltas.map(pd => L('bottleneckProject')(pd.project, pd.delta)).join(' · ');
+        bottleneckHtml += `<li class="bottleneck-item improvement">📊 ${L('bottleneckPartial')(r.teamName, r.capIncrease)}<div class="bottleneck-detail">${detail}</div></li>`;
       } else {
         bottleneckHtml += `<li class="bottleneck-item neutral">○ ${L('bottleneckNoEffect')(r.teamName, r.capIncrease)}</li>`;
       }
